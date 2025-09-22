@@ -39,5 +39,21 @@ class Settings:
             "worker_model": os.getenv("WORKER_MODEL"),
             "reviewer_model": os.getenv("REVIEWER_MODEL"),
         }
+    
+    @property
+    def redis_host(self):
+        return os.getenv("REDIS_HOST")
+    
+    @property
+    def redis_port(self):
+        return os.getenv("REDIS_PORT")
+    
+    @property
+    def redis_db(self):
+        return os.getenv("REDIS_DB")
+
+    @property
+    def tool_cache_expiry(self):
+        return os.getenv("TOOL_CACHE_EXPIRY")
 
 settings = Settings()
