@@ -267,3 +267,12 @@ class FunctionCallingAgent:
                 "content": full_response,
             }
         )
+    
+    async def run(self, query: str):
+        self.add_to_context_window(
+            {
+                "role": "user",
+                "content": query,
+            }
+        )
+        return await self._run(self.get_context_window())
