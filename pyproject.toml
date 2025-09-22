@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.116.2",
+    "grpcio>=1.75.0",
     "llama-index-core>=0.14.2",
     "nebula3-python>=3.8.3",
     "numpy>=2.3.3",
