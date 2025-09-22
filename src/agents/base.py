@@ -1,5 +1,5 @@
-import json
-from typing import Callable, List, Dict, Any
+import orjson
+from typing import Any, Callable, Dict, List
 from openai import AsyncOpenAI
 from config.settings import settings
 from src.utils.tools import tools_to_openai_schema
@@ -59,7 +59,7 @@ class FunctionCallingAgent:
         """
         try:
             function_name = tool_call["function"]["name"]
-            function_args = json.loads(tool_call["function"]["arguments"])
+            function_args = orjson.loads(tool_call["function"]["arguments"])
 
             # TODO CallBack Function: For Backend & Frontend Communication
             if self.kwargs.get("event_callback", None):
