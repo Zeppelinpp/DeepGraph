@@ -2,6 +2,39 @@
 
 GraphDB based QA Agent
 
+## Guide
+
+参考env.example配置自己的.env文件
+
+```
+# LLM Client
+OPENAI_API_KEY=<YOUR API KEY>
+OPENAI_BASE_URL=<YOUR BASE URL>
+
+# Agent Settings
+PLANNER_MODEL=qwen-max-latest
+WORKER_MODEL=qwen-plus-latest
+REVIEWER_MODEL=qwen-turbo
+
+# Nebula Settings
+NEBULA_PORT=
+NEBULA_HOST=
+NEBULA_USER=
+NEBULA_PASSWORD=
+
+# VectorDB Settigns
+VECTOR_DB_PATH=
+```
+使用config中的settings进行调用
+
+```
+from config.settings import settings
+
+api_key = settings.openai_api_key
+base_url = settings.openai_base_url
+# 其他配置可以自行在各自的.env中更新并在settings中更新
+```
+
 ## Structure
 
 - `src/tools` : 工具函数定义，注意 Docstring和类型注解
