@@ -50,7 +50,7 @@ class Settings:
     
     @property
     def redis_db(self):
-        return os.getenv("REDIS_DB")
+        return os.getenv("TOOL_DB")
 
     @property
     def tool_cache_expiry(self):
