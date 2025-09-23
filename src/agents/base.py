@@ -1,3 +1,4 @@
+import asyncio
 import orjson
 from typing import Any, Callable, Dict, List
 from openai import AsyncOpenAI
@@ -62,8 +63,6 @@ class FunctionCallingAgent:
             function_args = orjson.loads(tool_call["function"]["arguments"])
 
             # TODO CallBack Function: For Backend & Frontend Communication
-            if self.kwargs.get("event_callback", None):
-                self.kwargs["event_callback"]("tool_call", tool_call)
 
             if function_name not in self.tools_registry:
                 return (
@@ -77,7 +76,6 @@ class FunctionCallingAgent:
                     result = await result
 
                 # TODO Logging & CallBack Function
-                self.kwargs["event_callback"]("tool_result", result)
 
                 return str(result)
             else:
@@ -268,11 +266,11 @@ class FunctionCallingAgent:
             }
         )
     
-    async def run(self, query: str):
+    def run(self, query: str):
         self.add_to_context_window(
             {
                 "role": "user",
                 "content": query,
             }
         )
-        return await self._run(self.get_context_window())
+        return asyncio.run(self._run(self.get_context_window()))
