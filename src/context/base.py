@@ -1,10 +1,13 @@
 from typing import Protocol, List, Dict, Any
 
+
 class Manager(Protocol):
-    def build_context(self, query: str, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def build_context(
+        self, query: str, messages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Augment the context from a given query for LLM
-        
+
         Args:
             query: The query to augment the context
             messages: The messages to augment the context
@@ -21,8 +24,8 @@ class Manager(Protocol):
             message: The message to append to the context
         """
         pass
-    
-    def compress(self)->str:
+
+    def compress(self) -> str:
         """
         Compress the context into a string
 
@@ -30,7 +33,7 @@ class Manager(Protocol):
             The compressed context
         """
         pass
-    
+
     def prune(self) -> None:
         """
         Prune context into specified size
@@ -43,7 +46,9 @@ class Manager(Protocol):
         """
         pass
 
-    async def abuild_context(self, query: str, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def abuild_context(
+        self, query: str, messages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Async version of build_context
         """
@@ -54,19 +59,19 @@ class Manager(Protocol):
         Async version of append
         """
         pass
-    
+
     async def acompress(self) -> str:
         """
         Async version of compress
         """
         pass
-    
+
     async def aprune(self) -> None:
         """
         Async version of prune
         """
         pass
-    
+
     async def acheckpoint(self) -> None:
         """
         Async version of checkpoint

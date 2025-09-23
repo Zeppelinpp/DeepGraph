@@ -2,6 +2,7 @@ from typing import Callable, List, Dict, Any
 import inspect
 from typing import Union
 
+
 def _get_json_type(python_type) -> str:
     """
     Convert Python type to JSON schema type

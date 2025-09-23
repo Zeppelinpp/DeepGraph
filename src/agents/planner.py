@@ -63,6 +63,7 @@ class Planner:
 
 if __name__ == "__main__":
     import asyncio
+
     planner = Planner()
     task_list = asyncio.run(planner.plan("本月销售费用是否合理？"))
     print(task_list)

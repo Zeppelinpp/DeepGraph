@@ -61,7 +61,11 @@ class Worker(FunctionCallingAgent):
                 # Execute tool call and cache result
                 tool_result = await super()._handle_tool_call(tool_call)
                 if not tool_result.startswith("Execute Tool Function Error"):
-                    cache_expiry = int(settings.tool_cache_expiry) if settings.tool_cache_expiry else 86400
+                    cache_expiry = (
+                        int(settings.tool_cache_expiry)
+                        if settings.tool_cache_expiry
+                        else 86400
+                    )
                     self.redis_client.setex(cache_key, cache_expiry, tool_result)
         except Exception as e:
             # If Redis is not available, fall back to direct execution
@@ -97,9 +101,10 @@ if __name__ == "__main__":
         model="qwen-turbo",
         tools=[run_code],
         assigned_task=Task(
-            name="caculate", description="How many Rs in word 'KurtRosenwinkel, ignore case"
+            name="caculate",
+            description="How many Rs in word 'KurtRosenwinkel, ignore case",
         ),
     )
-    
+
     result = worker.run("Write code to solve the task")
     print(result)

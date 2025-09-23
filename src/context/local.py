@@ -9,7 +9,16 @@ class LocalManager(Manager):
     Local Context Manager: Specifically for a single Agent run
     Manage and augment the context window of a Agent run for better performance & result
     """
-    def __init__(self, model: str, persist_directory: str, messages: List[Dict[str, Any]] = None, retriever: Retriever = None, *args, **kwargs):
+
+    def __init__(
+        self,
+        model: str,
+        persist_directory: str,
+        messages: List[Dict[str, Any]] = None,
+        retriever: Retriever = None,
+        *args,
+        **kwargs,
+    ):
         self.model = model
         self.persist_directory = persist_directory
         self.messages = messages
@@ -20,8 +29,10 @@ class LocalManager(Manager):
         )
         self.args = args
         self.kwargs = kwargs
-    
-    async def build_context(self, query: str, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+    async def build_context(
+        self, query: str, messages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         if self.retriever:
             retrieved_context = await self.retriever.aretrieve(query, 10)
         else:
@@ -29,16 +40,13 @@ class LocalManager(Manager):
 
         augment_message = {
             "role": "assistant",
-            "content": f"Relevant Information:\n{retrieved_context}"
+            "content": f"Relevant Information:\n{retrieved_context}",
         }
         messages.append(augment_message)
         return messages
-    
+
     async def aappend(self, message: Dict[str, Any]) -> None:
         """
         Async version of append
         """
         self.messages.append(message)
-
-
-    

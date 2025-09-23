@@ -44,7 +44,7 @@ class FunctionCallingAgent:
 
     def clear_context_window(self) -> None:
         self.context_window = []
-    
+
     def set_context_window(self, messages: List[Dict[str, Any]]) -> None:
         self.context_window = messages
 
@@ -237,7 +237,7 @@ class FunctionCallingAgent:
             except Exception as e:
                 yield f"\n\nError in Agent Run: {e}"
         yield "\n\nMax iterations reached without final answer"
-    
+
     async def stream(self, query: str):
         """
         Stream the response from the Agent, High Level API
@@ -258,14 +258,14 @@ class FunctionCallingAgent:
         async for chunk in self._run_stream(self.get_context_window()):
             full_response += chunk
             yield chunk
-        
+
         self.add_to_context_window(
             {
                 "role": "assistant",
                 "content": full_response,
             }
         )
-    
+
     def run(self, query: str):
         self.add_to_context_window(
             {

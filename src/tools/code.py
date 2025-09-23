@@ -1,5 +1,6 @@
 import subprocess
 
+
 def run_code(code: str):
     """
     Python Code Interpreter, use print() to output the result
@@ -11,7 +12,9 @@ def run_code(code: str):
         The result of the code
     """
     try:
-        result = subprocess.run(["python", "-c", code], capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            ["python", "-c", code], capture_output=True, text=True, check=True
+        )
         return result.stdout.strip()
     except Exception as e:
         return f"Error: {e}"

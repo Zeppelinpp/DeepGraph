@@ -5,6 +5,7 @@ from src.agents.planner import Planner
 from src.agents.worker import Worker
 from src.models.events import SubTaskEvent, TaskResultEvent
 
+
 class DeepGraphWorkflow(Workflow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -20,7 +21,7 @@ class DeepGraphWorkflow(Workflow):
         for task_type, tasks in task_list.items():
             for task in tasks:
                 await ctx.store.set(task.name, [])
-        
+
         task_count = len(task_list.sequential_tasks) + len(task_list.parallel_tasks)
         await ctx.store.set("task_count", task_count)
         if task_list.sequential_tasks:
@@ -29,7 +30,9 @@ class DeepGraphWorkflow(Workflow):
             ctx.send_event(SubTaskEvent(task_list=task_list.parallel_tasks))
 
     @step
-    async def execute_sequential(self, ev: SubTaskEvent, ctx: Context) -> TaskResultEvent:
+    async def execute_sequential(
+        self, ev: SubTaskEvent, ctx: Context
+    ) -> TaskResultEvent:
         previous_task_result = None
         task_report = ""
         for task in ev.task_list:
@@ -60,10 +63,7 @@ class DeepGraphWorkflow(Workflow):
         # TODO Implement parallel execution
         return TaskResultEvent(ev.task_list)
 
-
     @step
     async def report(self, ev: TaskResultEvent, ctx: Context) -> StopEvent:
         task_count = await ctx.store.get("task_count")
         task_result_events = ctx.collect_events(ev, [TaskResultEvent] * task_count)
-
-

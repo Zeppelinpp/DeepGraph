@@ -55,5 +55,9 @@ class Settings:
     @property
     def tool_cache_expiry(self):
         return os.getenv("TOOL_CACHE_EXPIRY")
+    
+    @property
+    def tavily_key(self):
+        return os.getenv("TAVILY_KEY")
 
 settings = Settings()
