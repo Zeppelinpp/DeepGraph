@@ -42,7 +42,7 @@ base_url = settings.openai_base_url
 - `src/agents` : Agent类的定义与功能
 - `src/workflow` : 整体流程调度 + 服务端口定义
 - `src/context` : 上下文管理，动态知识注入(Retrieval)
-- `src/utils : 常用Utilities`
+- `src/utils`: 常用Utilities
 - `src/models` : 流程或者工具产生的数据结构定义
 - `src/prompts` : Agent或者工具使用到的提示词
 
@@ -206,11 +206,19 @@ classDiagram
     classDef toolClass fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     classDef configClass fill:#ffebee,stroke:#d32f2f,stroke-width:2px
     
-    class Task,TaskList,SearchResult,SubTaskEvent,TaskResultEvent modelClass
-    class FunctionCallingAgent,Planner,Worker agentClass
-    class DeepGraphWorkflow workflowClass
-    class ToolFunctions,ToolsUtility toolClass
-    class Settings,KnowledgeRetriever configClass
+    Task:::modelClass
+    TaskList:::modelClass
+    SearchResult:::modelClass
+    SubTaskEvent:::modelClass
+    TaskResultEvent:::modelClass
+    FunctionCallingAgent:::agentClass
+    Planner:::agentClass
+    Worker:::agentClass
+    DeepGraphWorkflow:::workflowClass
+    ToolFunctions:::toolClass
+    ToolsUtility:::toolClass
+    Settings:::configClass
+    KnowledgeRetriever:::configClass
 ```
 
 ## TODO
