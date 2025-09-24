@@ -199,26 +199,12 @@ classDiagram
     FunctionCallingAgent ..> ToolsUtility
     ToolFunctions ..> SearchResult
     
-    %% === 样式 ===
-    classDef modelClass fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
-    classDef agentClass fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef workflowClass fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
-    classDef toolClass fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef configClass fill:#ffebee,stroke:#d32f2f,stroke-width:2px
-    
-    Task:::modelClass
-    TaskList:::modelClass
-    SearchResult:::modelClass
-    SubTaskEvent:::modelClass
-    TaskResultEvent:::modelClass
-    FunctionCallingAgent:::agentClass
-    Planner:::agentClass
-    Worker:::agentClass
-    DeepGraphWorkflow:::workflowClass
-    ToolFunctions:::toolClass
-    ToolsUtility:::toolClass
-    Settings:::configClass
-    KnowledgeRetriever:::configClass
+    %% === 样式定义 ===
+    classDef modelClass fill:#e8f5e8
+    classDef agentClass fill:#fff3e0
+    classDef workflowClass fill:#e1f5fe
+    classDef toolClass fill:#f3e5f5
+    classDef configClass fill:#ffebee
 ```
 
 ## TODO
