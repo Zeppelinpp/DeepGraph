@@ -3,7 +3,8 @@ import subprocess
 
 def run_code(code: str):
     """
-    Python Code Interpreter, use print() to output the result
+    Python Code Interpreter
+    Use print() to output each demanded result
 
     Args:
         code: The code to run
