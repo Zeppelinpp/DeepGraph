@@ -7,7 +7,12 @@ class KnowledgeRetriever:
 
     def retrieve(self, query: str):
         with open(self.persist_directory, "r", encoding="utf-8") as f:
-            data = orjson.loads(f.read())
+            content = f.read()
+            try:
+                data = orjson.loads(content)
+            except (orjson.JSONDecodeError, TypeError):
+                import json
+                data = json.loads(content)
         if query in data:
             return data[query]["framework"]
         else:

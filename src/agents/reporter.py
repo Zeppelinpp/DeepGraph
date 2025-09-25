@@ -13,6 +13,7 @@ class Reporter:
         self.user_prompt = REPORTER_USER_PROMPT
     
     async def report(self, query: str, task_infos: str):
+        # TODO: Implement report template
         user_prompt = self.user_prompt.format(query=query, task_infos=task_infos)
         stream = await self.client.chat.completions.create(
             model=self.model,
