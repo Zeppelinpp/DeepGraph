@@ -65,6 +65,7 @@ def _load_schema_from_file(path: str) -> Dict[str, Any]:
 
 def _build_ngql_prompt_for_question(question: str, schema: Dict[str, Any]) -> str:
     schema_text = _schema_to_text(schema)
+    # TODO: 待优化: 数据库完成之后
     rules = """
 生成可直接执行的 nGQL 查询，仅返回 nGQL 一行或多行，不要解释、不要包裹代码块标记。
 
@@ -157,15 +158,9 @@ def nebula_query(question: str, schema_json: str, limit: Optional[int]) -> str:
             session.execute(f"USE `{NEBULA_GRAPH_SPACE}`;")
             print("--- [INFO] Executing nGQL on NebulaGraph ---")
             print(ngql_statement)
-            result = session.execute(ngql_statement)
-
-            if not result.is_succeeded():
-                return json.dumps({"error": f"执行失败: {result.error_msg()}"}, ensure_ascii=False)
-
-            column_names = result.keys()
+            result = session.execute(ngql_statement).as_primitive()
             for row in result:
-                record = {name: val.as_mixed() for name, val in zip(column_names, row.values)}
-                results_list.append(record)
+                results_list.append(row)
 
         pool.close()
         return json.dumps(results_list, ensure_ascii=False)
@@ -178,5 +173,5 @@ def nebula_query(question: str, schema_json: str, limit: Optional[int]) -> str:
 if __name__ == '__main__':
     # 示例：使用用户提供的 schema 和问题
     example_schema = _load_schema_from_file(os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'config', 'nebula_schema.json'))
-    question = "查询会计年度为2024、期间为10的凭证分录，返回前20行"
+    question = "有哪些会计科目？只要返回编码和名称, 参考schema"
     print(nebula_query(question, json.dumps(example_schema, ensure_ascii=False), limit=20))
