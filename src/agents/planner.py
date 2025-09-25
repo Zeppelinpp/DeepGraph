@@ -4,6 +4,7 @@ from config.settings import settings
 from src.utils.retriever import KnowledgeRetriever
 from src.models.base import TaskList
 from src.prompts.planner_prompts import PLANNER_PROMPT, INTENTION_RECOGNITION_PROMPT
+from src.utils.logger import logger
 
 
 class Planner:
@@ -28,11 +29,27 @@ class Planner:
             ],
             response_format={"type": "json_object"},
         )
-        return orjson.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content
+        try:
+            return orjson.loads(content)
+        except (orjson.JSONDecodeError, TypeError):
+            import json
+            return json.loads(content)
 
     async def plan(self, query: str):
         intention = await self.intention_recognition(query)
-        analysis_knowledge = self.knowledge_retriever.retrieve(intention["intention"])
+        framework_key = intention["intention"]
+        analysis_knowledge = self.knowledge_retriever.retrieve(framework_key)
+        
+        # Log framework extraction for traceability
+        logger.log_planner_framework_extraction(
+            query=query,
+            intention=framework_key,
+            framework_key=framework_key,
+            framework_content=analysis_knowledge,
+            retrieval_source="config/analysis_frame.json"
+        )
+        
         user_prompt = (
             f"""{query}\n参考这个分析框架思路进行计划:\n{analysis_knowledge}"""
         )
@@ -52,11 +69,30 @@ class Planner:
             },
         )
         try:
-            task_list = TaskList.model_validate(
-                orjson.loads(response.choices[0].message.content)
-            )
+            content = response.choices[0].message.content
+            try:
+                task_list_data = orjson.loads(content)
+            except (orjson.JSONDecodeError, TypeError):
+                import json
+                task_list_data = json.loads(content)
+            
+            # Set execution_type for tasks
+            for task_data in task_list_data.get("sequential_tasks", []):
+                task_data["execution_type"] = "Sequential"
+            for task_data in task_list_data.get("parallel_tasks", []):
+                task_data["execution_type"] = "Parallel"
+            
+            task_list = TaskList.model_validate(task_list_data)
+            
+            # Log task planning completion
+            total_tasks = len(task_list.sequential_tasks) + len(task_list.parallel_tasks)
+            logger.logger.info(f"[PLANNER:Planning] Generated {total_tasks} tasks | "
+                             f"Sequential: {len(task_list.sequential_tasks)} | "
+                             f"Parallel: {len(task_list.parallel_tasks)}")
+            
             return task_list
         except Exception as e:
+            logger.logger.error(f"[PLANNER:Error] Failed to parse task list: {e}")
             print(e)
             return False
 
