@@ -1,19 +1,16 @@
 import os
 import json
 from typing import List, Dict, Any, Optional
-
-# 使用 openai SDK 进行 API 调用
+import re
 import openai
-# 使用 dotenv 库加载 .env 文件中的环境变量
 from dotenv import load_dotenv
 
-# 导入NebulaGraph Python客户端
 from nebula3.gclient.net import ConnectionPool
-from nebula3.sclient.session import Session
+from nebula3.Config import Config
 
 load_dotenv()
 
-# 初始化 OpenAI 客户端
+
 try:
     client = openai.OpenAI(
         api_key=os.environ["OPENAI_API_KEY"],
@@ -28,53 +25,82 @@ NEBULA_HOST = os.getenv("NEBULA_HOST", "127.0.0.1")
 NEBULA_PORT = int(os.getenv("NEBULA_PORT", 9669)) # 端口号需要是整数
 NEBULA_USER = os.getenv("NEBULA_USER", "root")
 NEBULA_PASSWORD = os.getenv("NEBULA_PASSWORD", "nebula")
-NEBULA_GRAPH_SPACE = "financial_reports"
+NEBULA_GRAPH_SPACE = os.getenv("NEBULA_GRAPH_SPACE", "test")
 
 # ----------------------------------------------------------------------------
 # 辅助函数
 # ----------------------------------------------------------------------------
-def _build_ngql_prompt(subjects: List[str], periods: List[int]) -> str:
-    schema_description = """
-# NebulaGraph Schema 说明：
-# 你的任务是将用户的自然语言查询翻译成nGQL(NebulaGraph Query Language)语句。
+def _schema_to_text(schema: Dict[str, Any]) -> str:
+    lines = []
+    space = schema.get("space", NEBULA_GRAPH_SPACE)
+    lines.append(f"当前使用的图空间: `{space}`\n")
+    lines.append("已存在的点 Tags 及属性:")
+    for tag in schema.get("tags", []):
+        lines.append(f"- Tag `{tag.get('name')}` (属性数: {tag.get('property_count')})")
+        for prop in tag.get("properties", []):
+            pname = prop.get("name")
+            ptype = prop.get("data_type")
+            lines.append(f"  - `{pname}`: {ptype}")
+    lines.append("(注意：当前未建立边/关系，查询仅限点级检索)")
+    return "\n".join(lines)
 
-## 点 (Vertex) Tags:
-### `FinancialAccount` (财务科目记录)
-- `account_id` (string): 科目编码, 例如 "6602"。
-- `account_name` (string): 科目全名, 例如 "销售费用-广告费"。
-- `year` (int): 数据对应的年份, 例如 2024。
-- `period` (int): 数据对应的期间（月份）, 例如 9。
-- `balance_open` (double): 期初本位币。
-- `debit_amount` (double): 本期借方本位币。
-- `credit_amount` (double): 本期贷方本位币。
-- `balance_close` (double): 期末本位币。
+def _load_schema_from_file(path: str) -> Dict[str, Any]:
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            raw = json.load(f)
+        schema_obj = raw.get('schema') or {}
+        tags = []
+        for tag_name, tag_info in schema_obj.items():
+            props = tag_info.get('properties') or []
+            tags.append({
+                'name': tag_name,
+                'property_count': len(props),
+                'properties': [{'name': p, 'data_type': 'string'} for p in props]
+            })
+        return {'space': NEBULA_GRAPH_SPACE, 'tags': tags}
+    except Exception as e:
+        print(f"[WARN] Failed to load schema file: {e}")
+        return {'space': NEBULA_GRAPH_SPACE, 'tags': []}
 
-## 任务与规则:
-1.  根据用户提供的 "会计科目列表" 和 "期间列表"，生成一条能够查询到这些科目在指定年份期间所有详细数据的 nGQL 语句。
-2.  你的回答**必须**只返回 nGQL 查询语句本身，不要包含任何额外的解释或Markdown代码块标记 (```)。
-3.  查询的目标是 `FinancialAccount` 点。
-4.  使用 `LOOKUP` 语句进行查询。确保你已经为 `account_name` 和 `year` 属性创建了索引。
-5.  返回 `FinancialAccount` 的所有属性，并将属性名映射为我们下游工具能理解的中文名。
+
+def _build_ngql_prompt_for_question(question: str, schema: Dict[str, Any]) -> str:
+    schema_text = _schema_to_text(schema)
+    rules = """
+生成可直接执行的 nGQL 查询，仅返回 nGQL 一行或多行，不要解释、不要包裹代码块标记。
+
+重要格式要求：
+1. 只使用 MATCH 语句，格式：MATCH (v:标签名) WHERE 条件 RETURN v
+2. 标签名和属性名用反引号包围，如：`凭证分录`、`会计年度`
+3. 数字比较不要加引号，如：v.`会计年度` == 2024
+4. 字符串比较要加引号，如：v.`科目名称` == "现金"
+5. 绝对不要使用 LIMIT 或 LOOKUP 语句
+6. 让数据库返回所有匹配结果
+
+示例：
+MATCH (v:`凭证分录`) WHERE v.`会计年度` == 2024 AND v.`期间` == 12 RETURN v
+MATCH (v:`凭证分录`) WHERE v.`科目编码` == "1001" RETURN v
 """
-    final_prompt = f"""
-{schema_description}
----
-# 你的任务:
-请为以下用户输入生成 nGQL 语句：
+    prompt = f"""
+# 任务：将自然语言问题翻译为 nGQL
 
-- 科目列表: {json.dumps(subjects, ensure_ascii=False)}
-- 期间列表: {periods}
----
-# 你的回答 (nGQL):
+{rules}
+
+# 数据库结构（供参考）
+{schema_text}
+
+# 用户问题：
+{question}
+
+# 只输出可执行的 nGQL：
 """
-    return final_prompt
+    return prompt
 
 
-def _generate_ngql_from_llm(subjects: List[str], periods: List[int]) -> Optional[str]:
+def _generate_ngql_from_llm_by_question(question: str, schema: Dict[str, Any]) -> Optional[str]:
     """
-    调用大模型，根据科目和期间生成nGQL查询语句 (已更新为使用 OpenAI SDK)。
+    调用大模型：根据自然语言问题与提供的 schema 生成 nGQL 查询。
     """
-    prompt = _build_ngql_prompt(subjects, periods)
+    prompt = _build_ngql_prompt_for_question(question, schema)
     print("--- [INFO] Sending Prompt for nGQL generation via OpenAI-compatible API ---")
     try:
         response = client.chat.completions.create(
@@ -83,7 +109,7 @@ def _generate_ngql_from_llm(subjects: List[str], periods: List[int]) -> Optional
             # 这里不需要JSON模式，因为我们只需要纯文本的nGQL
             temperature=0,
         )
-        ngql_query = response.choices.message.content.strip()
+        ngql_query = response.choices[0].message.content.strip()
         if ngql_query:
             # 移除LLM可能添加的代码块标记
             if ngql_query.startswith("```"):
@@ -95,74 +121,62 @@ def _generate_ngql_from_llm(subjects: List[str], periods: List[int]) -> Optional
         print(f"[ERROR] An exception occurred during nGQL generation: {e}")
         return None
 
-# ----------------------------------------------------------------------------
-# 查询工具主函数
-# ----------------------------------------------------------------------------
-def query_financial_data(
-    subjects: List[str],
-    periods: List[int],
-    connection_pool: ConnectionPool
-) -> Optional[List[Dict[str, Any]]]:
+
+
+
+def nebula_query(question: str, schema_json: str, limit: Optional[int]) -> str:
     """
-    查询工具的主函数，用于从NebulaGraph中获取财务数据。
+    将自然语言问题转换为 nGQL 并在 NebulaGraph 上执行，返回 JSON 字符串结果。
+
+    参数：
+    - question: 自然语言问题，例如“查询2024年期间为12的凭证分录的借方金额前10行”。
+    - schema_json: 与当前图空间匹配的 schema JSON（包含 space、tags、properties）。
+    - limit: 可选，限制返回行数。
+
+    返回：
+    - JSON 字符串（列表），每个元素为一行记录的属性字典；失败时返回错误信息 JSON。
     """
-    ngql_statement = _generate_ngql_from_llm(subjects, periods)
+    try:
+        schema: Dict[str, Any] = json.loads(schema_json)
+    except Exception as e:
+        return json.dumps({"error": f"无效的schema_json: {e}"}, ensure_ascii=False)
+
+    ngql_statement = _generate_ngql_from_llm_by_question(question, schema)
     if not ngql_statement:
-        print("[ERROR] Halting execution because nGQL generation failed.")
-        return None
+        return json.dumps({"error": "nGQL 生成失败"}, ensure_ascii=False)
+
+    # 直接使用大模型生成的 nGQL，不再进行复杂清洗
 
     results_list: List[Dict[str, Any]] = []
     try:
-        with connection_pool.session_context(NEBULA_USER, NEBULA_PASSWORD) as session:
+        pool = ConnectionPool()
+        config = Config()
+        config.max_connection_pool_size = 10
+        pool.init([(NEBULA_HOST, NEBULA_PORT)], config)
+        with pool.session_context(NEBULA_USER, NEBULA_PASSWORD) as session:
             session.execute(f"USE `{NEBULA_GRAPH_SPACE}`;")
-            print(f"--- [INFO] Executing nGQL on NebulaGraph ---")
+            print("--- [INFO] Executing nGQL on NebulaGraph ---")
+            print(ngql_statement)
             result = session.execute(ngql_statement)
 
             if not result.is_succeeded():
-                print(f"[ERROR] Failed to execute nGQL on NebulaGraph: {result.error_msg()}")
-                return None
-            
+                return json.dumps({"error": f"执行失败: {result.error_msg()}"}, ensure_ascii=False)
+
             column_names = result.keys()
             for row in result:
                 record = {name: val.as_mixed() for name, val in zip(column_names, row.values)}
                 results_list.append(record)
-        
-        print(f"--- [INFO] Query successful. Fetched {len(results_list)} records. ---")
-        return results_list
+
+        pool.close()
+        return json.dumps(results_list, ensure_ascii=False)
     except Exception as e:
-        print(f"[ERROR] An exception occurred during NebulaGraph query execution: {e}")
-        return None
+        return json.dumps({"error": f"执行异常: {e}"}, ensure_ascii=False)
 
 # ----------------------------------------------------------------------------
 # 使用示例 
 # ----------------------------------------------------------------------------
 if __name__ == '__main__':
-    # 1. 初始化NebulaGraph连接池
-    try:
-        nebula_connection_pool = ConnectionPool()
-        nebula_connection_pool.init([(NEBULA_HOST, NEBULA_PORT)], 10)
-    except Exception as e:
-        print(f"[FATAL] Failed to initialize NebulaGraph connection pool: {e}")
-        exit(1)
-
-    # 2. 定义查询参数
-    subjects_to_query = ["销售费用-广告费"]
-    periods_to_query = [2024, 2023]
-
-    # 3. 调用查询工具主函数
-    financial_data = query_financial_data(
-        subjects=subjects_to_query,
-        periods=periods_to_query,
-        connection_pool=nebula_connection_pool
-    )
-
-    # 4. 打印结果
-    print("\n--- [RESULT] Final Query Output ---")
-    if financial_data:
-        print(json.dumps(financial_data, indent=2, ensure_ascii=False))
-    else:
-        print("Query failed or returned no data.")
-
-    # 5. 关闭连接池
-    nebula_connection_pool.close()
-    print("\n--- [INFO] NebulaGraph connection pool closed. ---")
+    # 示例：使用用户提供的 schema 和问题
+    example_schema = _load_schema_from_file(os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'config', 'nebula_schema.json'))
+    question = "查询会计年度为2024、期间为10的凭证分录，返回前20行"
+    print(nebula_query(question, json.dumps(example_schema, ensure_ascii=False), limit=20))
