@@ -6,20 +6,14 @@ load_dotenv()
 
 class Settings:
     @property
-    def nebula_host(self):
-        return os.getenv("NEBULA_HOST")
-
-    @property
-    def nebula_port(self):
-        return os.getenv("NEBULA_PORT")
-
-    @property
-    def nebula_user(self):
-        return os.getenv("NEBULA_USER")
-
-    @property
-    def nebula_password(self):
-        return os.getenv("NEBULA_PASSWORD")
+    def nebula(self):
+        return {
+            "host": os.getenv("NEBULA_HOST"),
+            "port": os.getenv("NEBULA_PORT"),
+            "user": os.getenv("NEBULA_USER"),
+            "password": os.getenv("NEBULA_PASSWORD"),
+            "space": os.getenv("NEBULA_SPACE"),
+        }
 
     @property
     def openai_api_key(self):
