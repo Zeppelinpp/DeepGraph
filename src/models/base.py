@@ -8,6 +8,7 @@ class Task(BaseModel):
     result: Optional[str] = None
     status: Optional[Literal["pending", "in_progress", "completed", "failed"]] = None
     success: Optional[bool] = None
+    execution_type: Optional[Literal["Sequential", "Parallel"]] = None
 
     def to_md(self) -> str:
         md = []
