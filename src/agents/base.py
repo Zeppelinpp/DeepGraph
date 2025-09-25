@@ -60,7 +60,20 @@ class FunctionCallingAgent:
         """
         try:
             function_name = tool_call["function"]["name"]
-            function_args = orjson.loads(tool_call["function"]["arguments"])
+            function_arguments = tool_call["function"]["arguments"]
+            
+            # 安全解析参数
+            if isinstance(function_arguments, str):
+                try:
+                    function_args = orjson.loads(function_arguments)
+                except (orjson.JSONDecodeError, TypeError):
+                    try:
+                        import json
+                        function_args = json.loads(function_arguments)
+                    except (json.JSONDecodeError, TypeError):
+                        function_args = function_arguments
+            else:
+                function_args = function_arguments
 
             # TODO CallBack Function: For Backend & Frontend Communication
 
@@ -265,6 +278,25 @@ class FunctionCallingAgent:
                 "content": full_response,
             }
         )
+
+    async def async_run(self, query: str):
+        """
+        Async version of run method for use in async contexts
+        """
+        self.add_to_context_window(
+            {
+                "role": "user",
+                "content": query,
+            }
+        )
+        result = await self._run(self.get_context_window())
+        self.add_to_context_window(
+            {
+                "role": "assistant", 
+                "content": result,
+            }
+        )
+        return result
 
     def run(self, query: str):
         self.add_to_context_window(
