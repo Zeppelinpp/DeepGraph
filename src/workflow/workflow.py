@@ -1,22 +1,33 @@
+import asyncio
 from llama_index.core.workflow import Context, Workflow, StartEvent, StopEvent, step
 from src.agents.planner import Planner
 from src.agents.worker import Worker
 from src.agents.reporter import Reporter
-from src.models.events import SequentialSubTaskEvent, ParallelSubTaskEvent, TaskResultEvent
+from src.models.events import (
+    SequentialSubTaskEvent,
+    ParallelSubTaskEvent,
+    TaskResultEvent,
+)
 from src.prompts.worker_prompts import WORKER_USER_PROMPT
 from src.tools.web import search_web
 from src.tools.code import run_code
 from config.settings import settings
+from src.utils.logger import logger
+from src.utils.web_logger import web_logger
 
 
 class DeepGraphWorkflow(Workflow):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.planner = Planner()
         self.reporter = Reporter()
+        super().__init__(timeout=12000, verbose=True)
 
     @step
-    async def plan(self, ev: StartEvent, ctx: Context) -> SequentialSubTaskEvent | ParallelSubTaskEvent:
+    async def plan(
+        self, ev: StartEvent, ctx: Context
+    ) -> SequentialSubTaskEvent | ParallelSubTaskEvent:
+        logger.log_workflow_step("plan", "StartEvent", f"Query: {ev.query}")
+
         await ctx.store.set("query", ev.query)
 
         task_list = await self.planner.plan(ev.query)
@@ -29,18 +40,52 @@ class DeepGraphWorkflow(Workflow):
 
         task_count = len(task_list.sequential_tasks) + len(task_list.parallel_tasks)
         await ctx.store.set("task_count", task_count)
+
+        logger.log_workflow_step(
+            "plan",
+            "TasksGenerated",
+            f"Total: {task_count} (Sequential: {len(task_list.sequential_tasks)}, Parallel: {len(task_list.parallel_tasks)})",
+        )
+
         if task_list.sequential_tasks:
             ctx.send_event(SequentialSubTaskEvent(task_list=task_list.sequential_tasks))
         if task_list.parallel_tasks:
             ctx.send_event(ParallelSubTaskEvent(task_list=task_list.parallel_tasks))
 
+    async def _execute_single_task_async(
+        self, worker: Worker, task, task_prompt: str
+    ) -> str:
+        """
+        Helper method to execute a single task asynchronously with proper cancellation handling
+        """
+        try:
+            return await worker.async_run(task_prompt)
+        except asyncio.CancelledError:
+            print(f"Task {task.name} was cancelled")
+            raise  # Re-raise to allow proper cancellation propagation
+        except KeyboardInterrupt:
+            print(f"Task {task.name} was interrupted by user")
+            raise asyncio.CancelledError("Task interrupted by user")
+        except Exception as e:
+            print(f"Error executing task {task.name}: {e}")
+            return f"Task execution failed: {e}"
+
     @step
     async def execute_sequential(
         self, ev: SequentialSubTaskEvent, ctx: Context
     ) -> TaskResultEvent:
+        logger.log_workflow_step(
+            "execute_sequential",
+            "SequentialSubTaskEvent",
+            f"Processing {len(ev.task_list)} sequential tasks",
+        )
+
         previous_task_results = []
         task_report = ""
         for task in ev.task_list:
+            # Log task execution start
+            logger.log_task_execution_start(task.name, "Sequential", task.description)
+
             print(f"\n=========== Executing task: {task.name}===========\n")
             worker = Worker(
                 name="worker",
@@ -66,13 +111,97 @@ class DeepGraphWorkflow(Workflow):
             task.status = "completed"
             task.success = True
 
+            # Log task execution end
+            logger.log_task_execution_end(
+                task.name, "Sequential", task.status, task.success
+            )
+
             previous_task_results.append(task)
 
         return TaskResultEvent(task_result=ev.task_list)
 
     @step
-    async def execute_parallel(self, ev: ParallelSubTaskEvent, ctx: Context) -> TaskResultEvent:
-        # TODO Implement parallel execution
+    async def execute_parallel(
+        self, ev: ParallelSubTaskEvent, ctx: Context
+    ) -> TaskResultEvent:
+        logger.log_workflow_step(
+            "execute_parallel",
+            "ParallelSubTaskEvent",
+            f"Processing {len(ev.task_list)} parallel tasks",
+        )
+
+        # Log start of parallel tasks
+        for task in ev.task_list:
+            logger.log_task_execution_start(task.name, "Parallel", task.description)
+
+        # Implement true async parallel execution with proper cancellation handling
+        tasks = []
+        for task in ev.task_list:
+            print(f"\n=========== Executing task: {task.name} (parallel)===========\n")
+            worker = Worker(
+                name="worker",
+                description=f"Worker for task: {task.name}",
+                model=settings.agent_settigns["worker_model"],
+                tools=[search_web, run_code],
+                assigned_task=task,
+                context=ctx,
+            )
+            # TODO Retrieve schema context -> Get Schema
+            retrieved_context = None
+            task_prompt = WORKER_USER_PROMPT.format(
+                previous_task_results=[],
+                retrieved_context=retrieved_context,
+                query="",
+            )
+            # Use async_run instead of run to avoid event loop issues
+            tasks.append(self._execute_single_task_async(worker, task, task_prompt))
+
+        # Execute all tasks concurrently with proper exception handling
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+        except asyncio.CancelledError:
+            # Handle graceful cancellation
+            logger.log_workflow_step(
+                "execute_parallel", "Cancelled", "Parallel tasks were cancelled"
+            )
+            # Cancel all remaining tasks
+            for task_coroutine in tasks:
+                if hasattr(task_coroutine, "cancel"):
+                    task_coroutine.cancel()
+            # Set all tasks as cancelled
+            for task in ev.task_list:
+                task.result = "Task was cancelled"
+                task.status = "cancelled"
+                task.success = False
+                logger.log_task_execution_end(
+                    task.name, "Parallel", task.status, task.success
+                )
+            raise
+
+        # Process results and log completion
+        for task, result in zip(ev.task_list, results):
+            if isinstance(result, asyncio.CancelledError):
+                task.result = "Task was cancelled"
+                task.status = "cancelled"
+                task.success = False
+            elif isinstance(result, Exception):
+                task.result = f"Task failed with error: {result}"
+                task.status = "failed"
+                task.success = False
+            else:
+                task.result = result
+                if result == "Max iterations reached without final answer":
+                    task.status = "failed"
+                    task.success = False
+                else:
+                    task.status = "completed"
+                    task.success = True
+
+            # Log task completion
+            logger.log_task_execution_end(
+                task.name, "Parallel", task.status, task.success
+            )
+
         return TaskResultEvent(task_result=ev.task_list)
 
     @step
@@ -80,44 +209,124 @@ class DeepGraphWorkflow(Workflow):
         task_result_events = ctx.collect_events(ev, [TaskResultEvent] * 2)
 
         task_infos = []
+        if task_result_events:
+            if len(task_result_events) == 2:
+                for task_result_event in task_result_events:
+                    for task in task_result_event.task_result:
+                        if task.result:
+                            # Get tool call from task
+                            tool_calls = await ctx.store.get(task.name)
+                            tool_info = [
+                                f"- {tool_call['tool_name']}: {tool_call['tool_result']}"
+                                for tool_call in tool_calls
+                            ]
+                            task_info = (
+                                task.to_md()
+                                + "\n"
+                                + "\n".join(["工具调用:\n"] + tool_info)
+                            )
+                            task_infos.append(task_info)
 
-        if not task_result_events:
-            return None
+                # TODO Report Agent
+                query = await ctx.store.get("query")
+                report = ""
+                report_stream = self.reporter.report(query, "\n".join(task_infos))
+                async for chunk in report_stream:
+                    print(chunk, end="")
+                    report += chunk
+                print("\n")
+                return StopEvent(result=report)
 
-        if len(task_result_events) == 2:
-            for task_result_event in task_result_events:
-                for task in task_result_event.task_result:
-                    if task.result:
-                        # Get tool call from task
-                        tool_calls = await ctx.store.get(task.name)
-                        tool_info = [
-                            f"- {tool_call['tool_name']}: {tool_call['tool_result']}"
-                            for tool_call in tool_calls
-                        ]
-                        task_info = task.to_md() + "\n" + "\n".join(["工具调用:\n"] + tool_info)
-                        task_infos.append(task_info)
+    async def run_with_web_logging(self, query: str):
+        """运行工作流并启用Web日志记录，支持优雅关闭"""
+        # 开始Web会话
+        session_id = web_logger.start_run(query)
 
-            # TODO Report Agent
-            query = await ctx.store.get("query")
-            report = ""
-            report_stream = self.reporter.report(query, "\n".join(task_infos))
-            async for chunk in report_stream:
-                print(chunk, end="")
-                report += chunk
-            print("\n")
-            return StopEvent(result=report)
+        try:
+            # 运行工作流
+            result = await self.run(query=query)
+
+            # 标记会话完成
+            web_logger.end_run("completed")
+            return result
+
+        except asyncio.CancelledError:
+            # 处理取消操作
+            web_logger.log_error(
+                "工作流被取消",
+                "用户中断或系统取消",
+                {"query": query, "session_id": session_id},
+            )
+            web_logger.end_run("cancelled")
+            print("工作流已被取消")
+            raise
+
+        except KeyboardInterrupt:
+            # 处理键盘中断
+            web_logger.log_error(
+                "工作流被中断",
+                "用户按Ctrl+C中断",
+                {"query": query, "session_id": session_id},
+            )
+            web_logger.end_run("interrupted")
+            print("工作流已被用户中断")
+            raise asyncio.CancelledError("工作流被用户中断")
+
+        except Exception as e:
+            # 记录其他错误并标记会话失败
+            web_logger.log_error(
+                "工作流执行失败", str(e), {"query": query, "session_id": session_id}
+            )
+            web_logger.end_run("failed")
+            raise
 
 
 async def main():
-    workflow = DeepGraphWorkflow(
-        timeout=1200,
-        verbose=True,
-    )
-    result = await workflow.run(query="金蝶国际最近半年的财务分析")
-    print(result)
+    """主函数，支持优雅的异常处理和取消"""
+    workflow = DeepGraphWorkflow()
+
+    try:
+        result = await workflow.run_with_web_logging("金蝶国际最近半年的财务分析")
+        print("工作流执行完成:")
+        print(result)
+
+    except asyncio.CancelledError:
+        print("工作流已被取消")
+        return
+
+    except KeyboardInterrupt:
+        print("程序被用户中断")
+        return
+
+    except Exception as e:
+        print(f"工作流执行失败: {e}")
+        return
+
+
+def run_main():
+    """运行主函数的包装器，处理事件循环和信号"""
+    import signal
+    import sys
+
+    def signal_handler(signum, frame):
+        print("\n收到中断信号，正在优雅关闭...")
+        sys.exit(0)
+
+    # 注册信号处理器
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n程序被用户中断")
+    except Exception as e:
+        print(f"\n程序执行失败: {e}")
+    finally:
+        print("程序已退出")
 
 
 if __name__ == "__main__":
     import asyncio
 
-    asyncio.run(main())
+    run_main()
