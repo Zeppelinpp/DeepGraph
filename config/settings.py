@@ -33,6 +33,7 @@ class Settings:
             "planner_model": os.getenv("PLANNER_MODEL"),
             "worker_model": os.getenv("WORKER_MODEL"),
             "reviewer_model": os.getenv("REVIEWER_MODEL"),
+            "summarize_model": os.getenv("SUMMARIZE_MODEL"),
         }
 
     @property
