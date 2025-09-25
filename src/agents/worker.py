@@ -2,7 +2,6 @@ from typing import override, Dict, Any, Optional
 import hashlib
 import orjson
 import redis
-from openai import AsyncOpenAI
 from llama_index.core.workflow import Context
 from src.agents.base import FunctionCallingAgent
 from src.models.base import Task
@@ -22,10 +21,16 @@ class Worker(FunctionCallingAgent):
         )
         self.context = context
         # Initialize Redis client for caching
-        self.redis_client = redis.Redis(
+        self.tool_db = redis.Redis(
             host=settings.redis_host,
             port=int(settings.redis_port) if settings.redis_port else 6379,
-            db=int(settings.redis_db) if settings.redis_db else 0,
+            db=int(settings.tool_db) if settings.tool_db else 0,
+            decode_responses=True,
+        )
+        self.task_db = redis.Redis(
+            host=settings.redis_host,
+            port=int(settings.redis_port) if settings.redis_port else 6379,
+            db=int(settings.task_db) if settings.task_db else 0,
             decode_responses=True,
         )
         super().__init__(system_prompt=system_prompt, *args, **kwargs)
@@ -53,7 +58,7 @@ class Worker(FunctionCallingAgent):
 
         try:
             # Check if result exists in cache
-            cached_result = self.redis_client.get(cache_key)
+            cached_result = self.tool_db.get(cache_key)
             if cached_result:
                 # Return cached result
                 tool_result = cached_result
@@ -66,7 +71,17 @@ class Worker(FunctionCallingAgent):
                         if settings.tool_cache_expiry
                         else 86400
                     )
-                    self.redis_client.setex(cache_key, cache_expiry, tool_result)
+                    self.tool_db.setex(cache_key, cache_expiry, tool_result)
+
+            # Bind tool result to task and save to Redis
+            task_name = f"TASK_{self.assigned_task.name}"
+            tool_entry = {
+                "tool_name": tool_call["function"]["name"],
+                "tool_args": tool_call["function"]["arguments"],
+                "tool_result": tool_result,
+            }
+            self.task_db.rpush(task_name, orjson.dumps(tool_entry))
+
         except Exception as e:
             # If Redis is not available, fall back to direct execution
             print(f"Redis cache error: {e}, falling back to direct execution")
@@ -101,8 +116,8 @@ if __name__ == "__main__":
         model="qwen-turbo",
         tools=[run_code],
         assigned_task=Task(
-            name="caculate",
-            description="How many Rs in word 'KurtRosenwinkel, ignore case",
+            name="Analyze",
+            description="How many Rs in word 'Strawberryrr', ignore case. And what is that number times 5",
         ),
     )
 

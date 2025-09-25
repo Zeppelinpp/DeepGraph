@@ -4,6 +4,7 @@ from llama_index.core.workflow import Context, Workflow, StartEvent, StopEvent, 
 from src.agents.planner import Planner
 from src.agents.worker import Worker
 from src.models.events import SubTaskEvent, TaskResultEvent
+from src.prompts.worker_prompts import WORKER_USER_PROMPT
 
 
 class DeepGraphWorkflow(Workflow):
@@ -33,15 +34,18 @@ class DeepGraphWorkflow(Workflow):
     async def execute_sequential(
         self, ev: SubTaskEvent, ctx: Context
     ) -> TaskResultEvent:
-        previous_task_result = None
+        previous_task_results = None
         task_report = ""
         for task in ev.task_list:
             print(f"\n=========== Executing task: {task.name}===========\n")
             worker = Worker(task, ctx)
-            task_prompt = f"""
-            先前的任务结果: {previous_task_result}
-            按照要求完成当前任务并输出任务汇报
-            """
+            # TODO Retrieve schema context
+            retrieved_context = None
+            task_prompt = WORKER_USER_PROMPT.format(
+                previous_task_results=previous_task_results,
+                retrieved_context=retrieved_context,
+                query="",
+            )
             async for chunk in worker.stream(task_prompt):
                 print(chunk, end="")
                 task_report += chunk
