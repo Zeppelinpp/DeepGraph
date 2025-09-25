@@ -2,6 +2,9 @@ import os
 import json
 import logging
 from typing import List, Dict, Any, Optional
+from src.agents.base import FunctionCallingAgent
+from src.tools.code import run_code
+from src.utils.tools import tools_to_openai_schema
 
 # 导入必要的库
 try:
@@ -60,6 +63,8 @@ def call_llm_api(prompt: str) -> Optional[Dict[str, Any]]:
             model=TOOL_MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
+            tools=tools_to_openai_schema([run_code]),
+            tool_choice="auto",
             temperature=0,
         )
         
@@ -89,7 +94,7 @@ def call_llm_api(prompt: str) -> Optional[Dict[str, Any]]:
 def calculate_indicator(
     financial_data: List[Dict[str, Any]],
     analysis_task: str
-) -> Optional[Dict[str, Any]]:
+) -> str:
     """
     根据提供的财务数据列表和自然语言描述的分析任务，智能调用大模型进行分析。
 
@@ -98,7 +103,7 @@ def calculate_indicator(
         analysis_task: 需要执行的财务分析任务的自然语言描述。
 
     Returns:
-        一个包含分析结果的字典，如果调用失败则返回None。
+        包含分析结果的JSON字符串，如果调用失败则返回错误信息。
     """
     data_str = json.dumps(financial_data, ensure_ascii=False, indent=2)
 
@@ -107,14 +112,15 @@ def calculate_indicator(
 
 **请严格遵守以下指令和输出格式：**
 
-1.  **理解任务意图**: 首先，深入分析 [分析任务] 的核心要求。它可能是一个简单的指标计算（如“净利润率”），一个跨期比较（如“同比增长”），一个聚合查询（如“计算2024年总费用”），或是一个更复杂的分析（如“找出费用最高的三个科目”）。
+1.  **理解任务意图**: 首先，深入分析 [分析任务] 的核心要求。它可能是一个简单的指标计算（如"净利润率"），一个跨期比较（如"同比增长"），一个聚合查询（如"计算2024年总费用"），或是一个更复杂的分析（如"找出费用最高的三个科目"）。
 
 2.  **规划与执行**:
     *   对于复杂的任务，在脑中形成一个分析步骤。
+    *   如果需要计算，请使用 `run_code` 工具执行计算。
     *   从提供的财务数据中，智能地选择最相关的字段进行计算。例如，对于费用或收入，优先使用能代表当期发生额的字段（如 `期末本位币`, `本期借方本位币`）。
     *   如果数据中缺少直接可用的字段，但可以通过其他字段组合计算得出，请执行此计算，并在 `assumptions` 中说明你的计算方法。
 
-3.  **陈述假设与透明度**: 你的分析必须是透明且可复现的。如果计算过程中做出了任何假设（例如，假设“净利润 = 收入 - 成本 - 费用”），必须在输出的 `assumptions` 字段中清晰地说明。
+3.  **陈述假设与透明度**: 你的分析必须是透明且可复现的。如果计算过程中做出了任何假设（例如，假设"净利润 = 收入 - 成本 - 费用"），必须在输出的 `assumptions` 字段中清晰地说明。
 
 4.  **格式化输出**: 你的回答**必须**是一个格式化良好的JSON对象，且只包含此JSON对象。此对象的核心是一个名为 `analysis_results` 的**数组**，即使任务只有一个结果，也应放在数组中。
 
@@ -150,7 +156,12 @@ def calculate_indicator(
 """
     
     full_prompt = prompt_template.format(data_str=data_str, analysis_task=analysis_task)
-    return call_llm_api(full_prompt)
+    result = call_llm_api(full_prompt)
+    
+    if result:
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    else:
+        return json.dumps({"error": "无法完成财务指标分析，请检查数据或重试"}, ensure_ascii=False)
 
 
 # --- 3. 示例用法 ---

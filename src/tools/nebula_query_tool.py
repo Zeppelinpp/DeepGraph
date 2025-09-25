@@ -11,8 +11,6 @@ from dotenv import load_dotenv
 from nebula3.gclient.net import ConnectionPool
 from nebula3.sclient.session import Session
 
-# ================== 配置加载 ==================
-# 从 .env 文件加载环境变量到环境中
 load_dotenv()
 
 # 初始化 OpenAI 客户端
@@ -33,10 +31,9 @@ NEBULA_PASSWORD = os.getenv("NEBULA_PASSWORD", "nebula")
 NEBULA_GRAPH_SPACE = "financial_reports"
 
 # ----------------------------------------------------------------------------
-# 内部辅助函数
+# 辅助函数
 # ----------------------------------------------------------------------------
 def _build_ngql_prompt(subjects: List[str], periods: List[int]) -> str:
-    # ... (这个函数的内部逻辑与之前版本完全相同，无需改动) ...
     schema_description = """
 # NebulaGraph Schema 说明：
 # 你的任务是将用户的自然语言查询翻译成nGQL(NebulaGraph Query Language)语句。
@@ -99,7 +96,7 @@ def _generate_ngql_from_llm(subjects: List[str], periods: List[int]) -> Optional
         return None
 
 # ----------------------------------------------------------------------------
-# 查询工具主函数 (此函数无需修改)
+# 查询工具主函数
 # ----------------------------------------------------------------------------
 def query_financial_data(
     subjects: List[str],
@@ -137,13 +134,12 @@ def query_financial_data(
         return None
 
 # ----------------------------------------------------------------------------
-# 使用示例 (已更新为使用环境变量中的配置)
+# 使用示例 
 # ----------------------------------------------------------------------------
 if __name__ == '__main__':
     # 1. 初始化NebulaGraph连接池
     try:
         nebula_connection_pool = ConnectionPool()
-        # 使用从.env文件加载的配置进行初始化
         nebula_connection_pool.init([(NEBULA_HOST, NEBULA_PORT)], 10)
     except Exception as e:
         print(f"[FATAL] Failed to initialize NebulaGraph connection pool: {e}")
