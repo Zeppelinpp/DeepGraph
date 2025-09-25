@@ -3,7 +3,11 @@ from llama_index.core.workflow import Event
 from src.models.base import Task
 
 
-class SubTaskEvent(Event):
+class SequentialSubTaskEvent(Event):
+    task_list: List[Task]
+
+
+class ParallelSubTaskEvent(Event):
     task_list: List[Task]
 
 
