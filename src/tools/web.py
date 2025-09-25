@@ -35,7 +35,7 @@ async def search_web(query: str):
         base_url=settings.openai_base_url,
     )
     response = await client.chat.completions.create(
-        model="qwen-turbo",
+        model=settings.agent_settigns["summarize_model"],
         messages=[
             {
                 "role": "system",
