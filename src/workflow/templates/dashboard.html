@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepGraph 日志监控</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 头部导航 -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1 class="app-title">
+                        <i class="fas fa-chart-line"></i>
+                        DeepGraph 日志监控
+                    </h1>
+                </div>
+                <div class="header-right">
+                    <div class="connection-status" id="connectionStatus">
+                        <i class="fas fa-circle"></i>
+                        <span>连接中...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <main class="main-content">
+            <!-- 控制面板 -->
+            <div class="control-panel">
+                <div class="query-section">
+                    <h3><i class="fas fa-search"></i> 开始新分析</h3>
+                    <div class="query-form">
+                        <div class="input-group">
+                            <input 
+                                type="text" 
+                                id="queryInput" 
+                                placeholder="请输入您的财务分析问题，例如：本月销售费用是否合理？"
+                                class="query-input"
+                            >
+                            <button id="runButton" class="run-button">
+                                <i class="fas fa-play"></i>
+                                <span>开始分析</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 会话列表 -->
+            <div class="sessions-container">
+                <div class="sessions-header">
+                    <h3><i class="fas fa-history"></i> 分析历史</h3>
+                    <button id="refreshButton" class="refresh-button">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                
+                <div class="sessions-list" id="sessionsList">
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>暂无分析记录</p>
+                        <p class="empty-state-hint">开始一个新的财务分析来查看日志</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 任务详情面板 -->
+            <div class="tasks-panel" id="tasksPanel" style="display: none;">
+                <div class="tasks-header">
+                    <div class="tasks-title">
+                        <h3 id="tasksPanelTitle"><i class="fas fa-tasks"></i> 任务执行</h3>
+                        <div class="session-status" id="sessionStatus"></div>
+                    </div>
+                    <button id="closeTasks" class="close-button">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="tasks-content" id="tasksContent">
+                    <!-- 任务执行区域 -->
+                    <div class="execution-columns">
+                        <div class="execution-column">
+                            <div class="column-header">
+                                <h4><i class="fas fa-arrow-right"></i> Sequential Tasks</h4>
+                                <span class="task-count" id="sequentialCount">0</span>
+                            </div>
+                            <div class="tasks-list" id="sequentialTasks">
+                                <!-- Sequential任务卡片 -->
+                            </div>
+                        </div>
+                        
+                        <div class="execution-column">
+                            <div class="column-header">
+                                <h4><i class="fas fa-code-branch"></i> Parallel Tasks</h4>
+                                <span class="task-count" id="parallelCount">0</span>
+                            </div>
+                            <div class="tasks-list" id="parallelTasks">
+                                <!-- Parallel任务卡片 -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 传统日志视图 -->
+                    <div class="logs-section">
+                        <div class="logs-header-section">
+                            <h4><i class="fas fa-list"></i> 执行日志</h4>
+                            <button id="toggleLogs" class="toggle-button">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="logs-content" id="logsContent" style="display: none;">
+                            <!-- 日志条目将在这里动态生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 通知容器 -->
+    <div class="notifications" id="notifications"></div>
+
+    <!-- 加载指示器 -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>正在执行分析...</p>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
