@@ -6,7 +6,7 @@ class KnowledgeRetriever:
         self.persist_directory = persist_directory
 
     def retrieve(self, query: str):
-        with open(self.persist_directory, "r") as f:
+        with open(self.persist_directory, "r", encoding="utf-8") as f:
             data = orjson.loads(f.read())
         if query in data:
             return data[query]["framework"]

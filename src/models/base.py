@@ -9,6 +9,12 @@ class Task(BaseModel):
     status: Optional[Literal["pending", "in_progress", "completed", "failed"]] = None
     success: Optional[bool] = None
 
+    def to_md(self) -> str:
+        md = []
+        md.append(f"## Task:{self.name} - {self.description}")
+        md.append(f"Result: {self.result}")
+        return "\n".join(md)
+
 
 class TaskList(BaseModel):
     sequential_tasks: List[Task]

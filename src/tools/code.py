@@ -14,7 +14,11 @@ def run_code(code: str):
     """
     try:
         result = subprocess.run(
-            ["python", "-c", code], capture_output=True, text=True, check=True
+            ["python", "-c", code],
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding="utf-8"
         )
         return result.stdout.strip()
     except Exception as e:
