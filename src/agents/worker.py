@@ -2,7 +2,6 @@ from typing import override, Dict, Any, Optional
 import hashlib
 import orjson
 import redis
-from openai import AsyncOpenAI
 from llama_index.core.workflow import Context
 from src.agents.base import FunctionCallingAgent
 from src.models.base import Task
