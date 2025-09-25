@@ -9,7 +9,7 @@ import weakref
 
 
 class LogLevel(str, Enum):
-    """日志级别"""
+    """Log levels"""
 
     INFO = "info"
     WARNING = "warning"
@@ -18,7 +18,7 @@ class LogLevel(str, Enum):
 
 
 class LogType(str, Enum):
-    """日志类型"""
+    """Log types"""
 
     WORKFLOW = "workflow"
     TASK = "task"
@@ -29,7 +29,7 @@ class LogType(str, Enum):
 
 @dataclass
 class ToolCall:
-    """工具调用记录"""
+    """Tool call record"""
 
     id: str
     tool_name: str
@@ -55,7 +55,7 @@ class ToolCall:
 
 @dataclass
 class TaskEntry:
-    """任务条目"""
+    """Task entry"""
 
     id: str
     name: str
@@ -96,7 +96,7 @@ class TaskEntry:
 
 @dataclass
 class LogEntry:
-    """单个日志条目"""
+    """Single log entry"""
 
     id: str
     timestamp: datetime
@@ -108,7 +108,7 @@ class LogEntry:
     duration_ms: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典格式"""
+        """Convert to dictionary format"""
         data = asdict(self)
         data["timestamp"] = self.timestamp.isoformat()
         return data
@@ -116,7 +116,7 @@ class LogEntry:
 
 @dataclass
 class RunSession:
-    """运行会话"""
+    """Run session"""
 
     id: str
     query: str
@@ -134,27 +134,27 @@ class RunSession:
 
     @property
     def duration_ms(self) -> Optional[float]:
-        """会话持续时间（毫秒）"""
+        """Session duration (milliseconds)"""
         if self.end_time:
             return (self.end_time - self.start_time).total_seconds() * 1000
         return None
 
     @property
     def sequential_tasks(self) -> List[TaskEntry]:
-        """获取顺序任务"""
+        """Get sequential tasks"""
         return [
             task for task in self.tasks.values() if task.execution_type == "Sequential"
         ]
 
     @property
     def parallel_tasks(self) -> List[TaskEntry]:
-        """获取并行任务"""
+        """Get parallel tasks"""
         return [
             task for task in self.tasks.values() if task.execution_type == "Parallel"
         ]
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典格式"""
+        """Convert to dictionary format"""
         return {
             "id": self.id,
             "query": self.query,
@@ -171,7 +171,7 @@ class RunSession:
 
 
 class WebLogManager:
-    """Web UI日志管理器"""
+    """Web UI logger manager"""
 
     def __init__(self, max_sessions: int = 100):
         self.max_sessions = max_sessions
@@ -180,11 +180,11 @@ class WebLogManager:
         self.websocket_connections: weakref.WeakSet = weakref.WeakSet()
 
     def start_session(self, query: str) -> str:
-        """开始新的运行会话"""
+        """Start new run session"""
         session_id = str(uuid.uuid4())[:8]
         session = RunSession(id=session_id, query=query, start_time=datetime.now())
 
-        # 保持会话数量在限制内
+        # Keep session count within limit
         if len(self.sessions) >= self.max_sessions:
             oldest_session = min(self.sessions.values(), key=lambda s: s.start_time)
             del self.sessions[oldest_session.id]
@@ -192,19 +192,19 @@ class WebLogManager:
         self.sessions[session_id] = session
         self.current_session_id = session_id
 
-        # 广播新会话开始
+        # Broadcast new session start
         self._broadcast_update({"type": "session_start", "session": session.to_dict()})
 
         return session_id
 
     def end_session(self, status: str = "completed"):
-        """结束当前会话"""
+        """End current session"""
         if self.current_session_id and self.current_session_id in self.sessions:
             session = self.sessions[self.current_session_id]
             session.end_time = datetime.now()
             session.status = status
 
-            # 广播会话结束
+            # Broadcast session end
             self._broadcast_update(
                 {"type": "session_end", "session": session.to_dict()}
             )
@@ -220,7 +220,7 @@ class WebLogManager:
         details: Optional[Dict[str, Any]] = None,
         duration_ms: Optional[float] = None,
     ):
-        """添加日志条目"""
+        """Add log entry"""
         if not self.current_session_id:
             return
 
@@ -241,7 +241,7 @@ class WebLogManager:
 
         session.logs.append(log_entry)
 
-        # 广播新日志
+        # Broadcast new log
         self._broadcast_update(
             {
                 "type": "new_log",
@@ -251,7 +251,7 @@ class WebLogManager:
         )
 
     def get_sessions(self) -> List[Dict[str, Any]]:
-        """获取所有会话"""
+        """Get all sessions"""
         return [
             session.to_dict()
             for session in sorted(
@@ -260,68 +260,68 @@ class WebLogManager:
         ]
 
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """获取特定会话"""
+        """Get specific session"""
         session = self.sessions.get(session_id)
         return session.to_dict() if session else None
 
     def add_websocket(self, websocket):
-        """添加WebSocket连接"""
+        """Add WebSocket connection"""
         self.websocket_connections.add(websocket)
 
     def remove_websocket(self, websocket):
-        """移除WebSocket连接"""
+        """Remove WebSocket connection"""
         self.websocket_connections.discard(websocket)
 
     def _broadcast_update(self, message: Dict[str, Any]):
-        """广播更新到所有WebSocket连接"""
+        """Broadcast update to all WebSocket connections"""
         if not self.websocket_connections:
             return
 
         message_str = json.dumps(message, ensure_ascii=False)
 
-        # 异步发送到所有连接
+        # Async send to all connections
         asyncio.create_task(self._send_to_all_websockets(message_str))
 
     async def _send_to_all_websockets(self, message: str):
-        """发送消息到所有WebSocket连接"""
+        """Send message to all WebSocket connections"""
         if not self.websocket_connections:
             return
 
-        # 创建发送任务列表
+        # Create send task list
         tasks = []
         for ws in list(self.websocket_connections):
             try:
                 tasks.append(ws.send_text(message))
             except Exception:
-                # 连接已断开，会被WeakSet自动清理
+                # Connection is disconnected, will be automatically cleaned by WeakSet
                 pass
 
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
 
-# 全局Web日志管理器实例
+# Global Web log manager instance
 web_log_manager = WebLogManager()
 
 
 class WebUILogger:
-    """Web UI日志记录器"""
+    """Web UI logger"""
 
     def __init__(self, manager: WebLogManager = None):
         self.manager = manager or web_log_manager
 
     def start_run(self, query: str) -> str:
-        """开始运行会话"""
+        """Start running session"""
         return self.manager.start_session(query)
 
     def end_run(self, status: str = "completed"):
-        """结束运行会话"""
+        """End running session"""
         self.manager.end_session(status)
 
     def get_or_create_task(
         self, task_name: str, execution_type: str, description: str
     ) -> TaskEntry:
-        """获取或创建任务条目"""
+        """Get or create task entry"""
         if not self.manager.current_session_id:
             return None
 
@@ -338,7 +338,7 @@ class WebUILogger:
             )
             session.tasks[task_name] = task_entry
 
-            # 广播新任务
+            # Broadcast new task
             self.manager._broadcast_update(
                 {
                     "type": "task_created",
@@ -350,26 +350,26 @@ class WebUILogger:
         return session.tasks[task_name]
 
     def log_workflow_step(self, step_name: str, event_type: str, details: str = ""):
-        """记录工作流步骤"""
+        """Log workflow step"""
         self.manager.add_log(
             level=LogLevel.INFO,
             log_type=LogType.WORKFLOW,
-            title=f"工作流: {step_name}",
-            content=f"事件: {event_type}",
+            title=f"Workflow: {step_name}",
+            content=f"Event: {event_type}",
             details={"step": step_name, "event": event_type, "details": details},
         )
 
     def log_task_execution_start(
         self, task_name: str, execution_type: str, description: str
     ):
-        """记录任务开始执行"""
-        # 创建或获取任务条目
+        """Log task execution start"""
+        # Create or get task entry
         task_entry = self.get_or_create_task(task_name, execution_type, description)
         if task_entry:
             task_entry.status = "running"
             task_entry.start_time = datetime.now()
 
-            # 广播任务状态更新
+            # Broadcast task status update
             self.manager._broadcast_update(
                 {
                     "type": "task_updated",
@@ -378,11 +378,11 @@ class WebUILogger:
                 }
             )
 
-        # 保留原有的日志记录
+        # Keep original log record
         self.manager.add_log(
             level=LogLevel.INFO,
             log_type=LogType.TASK,
-            title=f"任务开始: {task_name}",
+            title=f"Task Start: {task_name}",
             content=f"[{execution_type}] {description}",
             details={
                 "task_name": task_name,
@@ -395,8 +395,8 @@ class WebUILogger:
     def log_task_execution_end(
         self, task_name: str, execution_type: str, status: str, success: bool
     ):
-        """记录任务执行结束"""
-        # 更新任务条目
+        """Log task execution end"""
+        # Update task entry
         if self.manager.current_session_id:
             session = self.manager.sessions.get(self.manager.current_session_id)
             if session and task_name in session.tasks:
@@ -405,7 +405,7 @@ class WebUILogger:
                 task_entry.success = success
                 task_entry.end_time = datetime.now()
 
-                # 广播任务状态更新
+                # Broadcast task status update
                 self.manager._broadcast_update(
                     {
                         "type": "task_updated",
@@ -420,7 +420,7 @@ class WebUILogger:
         self.manager.add_log(
             level=level,
             log_type=LogType.TASK,
-            title=f"任务完成: {task_name}",
+            title=f"Task Completed: {task_name}",
             content=f"[{execution_type}] {status_emoji} {status}",
             details={
                 "task_name": task_name,
@@ -440,8 +440,8 @@ class WebUILogger:
         tool_result: str,
         duration_ms: Optional[float] = None,
     ):
-        """记录工具调用"""
-        # 添加工具调用到任务
+        """Log tool call"""
+        # Add tool call to task
         if self.manager.current_session_id:
             session = self.manager.sessions.get(self.manager.current_session_id)
             if session and task_name in session.tasks:
@@ -455,7 +455,7 @@ class WebUILogger:
                 )
                 task_entry.tool_calls.append(tool_call)
 
-                # 广播工具调用更新
+                # Broadcast tool call update
                 self.manager._broadcast_update(
                     {
                         "type": "tool_call_added",
@@ -465,7 +465,7 @@ class WebUILogger:
                     }
                 )
 
-        # 截断长结果用于日志显示
+        # Truncate long result for logging display
         truncated_result = tool_result
         if len(tool_result) > 200:
             truncated_result = tool_result[:200] + "..."
@@ -473,7 +473,7 @@ class WebUILogger:
         self.manager.add_log(
             level=LogLevel.INFO,
             log_type=LogType.TOOL_CALL,
-            title=f"工具调用: {tool_name}",
+            title=f"Tool Call: {tool_name}",
             content=f"[{task_name}:{execution_type}] {truncated_result}",
             details={
                 "task_name": task_name,
@@ -494,12 +494,12 @@ class WebUILogger:
         framework_content: str,
         retrieval_source: str = "analysis_frame.json",
     ):
-        """记录框架提取"""
+        """Log framework extraction"""
         self.manager.add_log(
             level=LogLevel.INFO,
             log_type=LogType.FRAMEWORK,
-            title="框架提取",
-            content=f"意图: {intention} → 框架: {framework_key}",
+            title="Framework Extraction",
+            content=f"Intention: {intention} → Framework: {framework_key}",
             details={
                 "query": query,
                 "intention": intention,
@@ -512,15 +512,15 @@ class WebUILogger:
     def log_error(
         self, title: str, error: str, details: Optional[Dict[str, Any]] = None
     ):
-        """记录错误"""
+        """Log error"""
         self.manager.add_log(
             level=LogLevel.ERROR,
             log_type=LogType.SYSTEM,
-            title=f"错误: {title}",
+            title=f"Error: {title}",
             content=error,
             details=details,
         )
 
 
-# 全局Web UI日志记录器实例
+# Global Web UI logger instance
 web_logger = WebUILogger()

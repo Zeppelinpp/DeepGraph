@@ -21,12 +21,9 @@ def safe_serialize(data: Any) -> str:
     def convert_bytes(obj):
         if isinstance(obj, bytes):
             try:
-                # 尝试将bytes解码为字符串
                 return obj.decode("utf-8")
             except UnicodeDecodeError:
-                # 如果解码失败，转换为base64字符串
                 import base64
-
                 return f"<bytes:{base64.b64encode(obj).decode('ascii')}>"
         elif isinstance(obj, dict):
             return {k: convert_bytes(v) for k, v in obj.items()}
@@ -36,18 +33,14 @@ def safe_serialize(data: Any) -> str:
             return obj
 
     try:
-        # 首先尝试转换bytes类型
         converted_data = convert_bytes(data)
-        # 使用orjson序列化，返回str
         return orjson.dumps(converted_data, option=orjson.OPT_SORT_KEYS).decode("utf-8")
     except (TypeError, ValueError, orjson.JSONEncodeError) as e:
-        # 如果orjson失败，回退到标准json
         try:
             return json.dumps(
                 converted_data, sort_keys=True, ensure_ascii=False, default=str
             )
         except Exception:
-            # 最后的回退方案
             return str(data)
 
 
@@ -59,14 +52,11 @@ def safe_deserialize(data: str) -> Any:
         return data
 
     try:
-        # 使用orjson反序列化
         return orjson.loads(data)
     except (orjson.JSONDecodeError, TypeError):
         try:
-            # 回退到标准json
             return json.loads(data)
         except (json.JSONDecodeError, TypeError):
-            # 如果都失败，返回原始数据
             return data
 
 
@@ -179,12 +169,12 @@ class Worker(FunctionCallingAgent):
             task_name = f"TASK_{self.assigned_task.name}"
             tool_entry = {
                 "tool_name": tool_name,
-                "tool_args": tool_args,  # 直接存储，不需要双重序列化
+                "tool_args": tool_args,
                 "tool_result": tool_result,
                 "duration_ms": duration_ms,
                 "timestamp": time.time(),
             }
-            # 使用安全序列化存储到Redis
+            # Safe serialize to Redis
             self.task_db.rpush(task_name, safe_serialize(tool_entry))
 
         except Exception as e:

@@ -238,92 +238,92 @@ class DeepGraphWorkflow(Workflow):
                 return StopEvent(result=report)
 
     async def run_with_web_logging(self, query: str):
-        """运行工作流并启用Web日志记录，支持优雅关闭"""
-        # 开始Web会话
+        """Run workflow and enable Web logging"""
+        # Start Web session
         session_id = web_logger.start_run(query)
 
         try:
-            # 运行工作流
+            # Run workflow
             result = await self.run(query=query)
 
-            # 标记会话完成
+            # Mark session completed
             web_logger.end_run("completed")
             return result
 
         except asyncio.CancelledError:
-            # 处理取消操作
+            # Handle cancellation
             web_logger.log_error(
-                "工作流被取消",
-                "用户中断或系统取消",
+                "Workflow has been cancelled",
+                "User interrupt or system cancel",
                 {"query": query, "session_id": session_id},
             )
             web_logger.end_run("cancelled")
-            print("工作流已被取消")
+            print("Workflow has been cancelled")
             raise
 
         except KeyboardInterrupt:
-            # 处理键盘中断
+            # Handle keyboard interrupt
             web_logger.log_error(
-                "工作流被中断",
-                "用户按Ctrl+C中断",
+                "Workflow has been interrupted",
+                "User interrupt by Ctrl+C",
                 {"query": query, "session_id": session_id},
             )
             web_logger.end_run("interrupted")
-            print("工作流已被用户中断")
-            raise asyncio.CancelledError("工作流被用户中断")
+            print("Workflow has been interrupted by user")
+            raise asyncio.CancelledError("Workflow has been interrupted by user")
 
         except Exception as e:
-            # 记录其他错误并标记会话失败
+            # Record other errors and mark session failed
             web_logger.log_error(
-                "工作流执行失败", str(e), {"query": query, "session_id": session_id}
+                "Workflow execution failed", str(e), {"query": query, "session_id": session_id}
             )
             web_logger.end_run("failed")
             raise
 
 
 async def main():
-    """主函数，支持优雅的异常处理和取消"""
+    """Main function, support graceful exception handling and cancellation"""
     workflow = DeepGraphWorkflow()
 
     try:
         result = await workflow.run_with_web_logging("金蝶国际最近半年的财务分析")
-        print("工作流执行完成:")
+        print("Workflow execution completed:")
         print(result)
 
     except asyncio.CancelledError:
-        print("工作流已被取消")
+        print("Workflow has been cancelled")
         return
 
     except KeyboardInterrupt:
-        print("程序被用户中断")
+        print("Workflow has been interrupted by user")
         return
 
     except Exception as e:
-        print(f"工作流执行失败: {e}")
+        print(f"Workflow execution failed: {e}")
         return
 
 
 def run_main():
-    """运行主函数的包装器，处理事件循环和信号"""
+    """Wrapper for running main function, handling event loop and signals"""
     import signal
     import sys
 
     def signal_handler(signum, frame):
-        print("\n收到中断信号，正在优雅关闭...")
+        print("\nReceived interrupt signal, shutting down...")
         sys.exit(0)
 
-    # 注册信号处理器
+    # Register signal handler
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n程序被用户中断")
+        print("\nWorkflow has been interrupted by user")
     except Exception as e:
-        print(f"\n程序执行失败: {e}")
+        print(f"\nWorkflow execution failed: {e}")
     finally:
-        print("程序已退出")
+        print("Workflow has been exited")
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ import json
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-# 延迟导入web_logger以避免循环导入
+# Lazy import web_logger to avoid circular import
 def get_web_logger():
     try:
         from src.utils.web_logger import web_logger
@@ -69,13 +69,13 @@ class DeepGraphLogger:
             "duration_ms": duration_ms
         }
         
-        # 终端日志
+        # Console logger
         self.logger.info(
             f"{prefix} Tool Call - {tool_name} | Args: {json.dumps(safe_args, ensure_ascii=False)} | "
             f"Result: {truncated_result} | Duration: {duration_ms}ms"
         )
         
-        # Web UI日志
+        # Web UI logger
         web_logger = get_web_logger()
         if web_logger:
             web_logger.log_tool_call(task_name, execution_type, tool_name, tool_args, tool_result, duration_ms)
@@ -98,7 +98,7 @@ class DeepGraphLogger:
             framework_content: Retrieved framework content
             retrieval_source: Source of the framework data
         """
-        # 终端日志
+        # Console logger
         self.logger.info(
             f"[PLANNER:Framework] Query: '{query}' | "
             f"Intention: '{intention}' | "
@@ -107,7 +107,7 @@ class DeepGraphLogger:
             f"Framework: {framework_content[:200]}{'...' if len(framework_content) > 200 else ''}"
         )
         
-        # Web UI日志
+        # Web UI logger
         web_logger = get_web_logger()
         if web_logger:
             web_logger.log_framework_extraction(query, intention, framework_key, framework_content, retrieval_source)
@@ -115,10 +115,10 @@ class DeepGraphLogger:
     def log_task_execution_start(self, task_name: str, execution_type: str, description: str):
         """Log the start of task execution"""
         prefix = f"[{task_name}:{execution_type}]"
-        # 终端日志
+        # Console logger
         self.logger.info(f"{prefix} Task Started - {description}")
         
-        # Web UI日志
+        # Web UI logger
         web_logger = get_web_logger()
         if web_logger:
             web_logger.log_task_execution_start(task_name, execution_type, description)
@@ -137,10 +137,10 @@ class DeepGraphLogger:
     
     def log_workflow_step(self, step_name: str, event_type: str, details: str = ""):
         """Log workflow step execution"""
-        # 终端日志
+        # Console logger
         self.logger.info(f"[WORKFLOW:{step_name}] Event: {event_type} | {details}")
         
-        # Web UI日志
+        # Web UI logger
         web_logger = get_web_logger()
         if web_logger:
             web_logger.log_workflow_step(step_name, event_type, details)
