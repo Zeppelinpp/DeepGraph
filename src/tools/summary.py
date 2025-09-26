@@ -92,24 +92,30 @@ def call_llm_api(prompt: str) -> Optional[Dict[str, Any]]:
 
 
 def generate_summary_report(
-    analysis_thought: str,
-    query_data: List[Dict[str, Any]],
-    indicator_results: List[Dict[str, Any]],
     section_title: str = "财务分析小节"
 ) -> str:
     """
     根据分析思路、查询数据和指标计算结果生成财务分析报告小节。
 
     Args:
-        analysis_thought (str): Planner给出的自然语言分析思路
-        query_data (List[Dict[str, Any]]): 从Nebula数据库查询到的原始数据
-        indicator_results (List[Dict[str, Any]]): 指标计算工具返回的计算结果
         section_title (str): 报告小节的标题，默认为"财务分析小节"
 
     Returns:
         str: 包含生成报告小节的JSON字符串，如果调用失败则返回错误信息
     """
-    
+    #TODO 获取数据
+    get_DATA = analysis_thought  # analysis_thought (str): 自然语言分析思路
+    get_DATA = query_data   # query_data (List[Dict[str, Any]]): 从Nebula数据库查询到的原始数据
+    get_DATA = indicator_results  # indicator_results (List[Dict[str, Any]]): 指标计算工具返回的计算结果
+
+
+
+
+
+
+
+
+
     # 将数据转换为JSON字符串以便在prompt中使用
     query_data_str = json.dumps(query_data, ensure_ascii=False, indent=2)
     indicator_results_str = json.dumps(indicator_results, ensure_ascii=False, indent=2)
@@ -203,6 +209,10 @@ def generate_summary_report(
         result = call_llm_api(full_prompt)
         if result:
             return json.dumps(result, ensure_ascii=False, indent=2)
+        #TODO 保存数据
+        #save
+
+
         else:
             return json.dumps({"error": "无法生成财务分析报告小节，请检查数据或重试"}, ensure_ascii=False)
     except Exception as e:
