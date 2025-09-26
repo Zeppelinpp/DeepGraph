@@ -4,7 +4,7 @@
 
 ## 查数工具 `nebula_query`
 ```python
-def nebula_query(node_types: List[str], query: str) -> DataFrame:
+def nebula_query(node_types: List[str], query: str) -> str:
     """
     node_types: 查询可能涉及的节点，worker会被提供所有可选node_types然后决定这次查询需要哪些node_types
     query: 查询的目标
