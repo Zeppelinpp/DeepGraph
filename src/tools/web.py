@@ -2,6 +2,8 @@ from tavily import TavilyClient
 from pydantic import BaseModel
 from openai import AsyncOpenAI
 from config.settings import settings
+from typing import Optional
+from llama_index.core.workflow import Context
 
 search_client = TavilyClient(api_key=settings.tavily_key)
 
@@ -19,7 +21,10 @@ class SearchResult(BaseModel):
         return "\n".join(md)
 
 
-async def search_web(query: str):
+async def search_web(query: str, context: Optional[Context] = None):
+    if context:
+        original_query = await context.store.get("query")
+        print(f"Original query: {original_query}")
     response = search_client.search(query)
     results = []
     for result in response["results"]:
