@@ -1,7 +1,9 @@
 import subprocess
+from typing import Optional
+from llama_index.core.workflow import Context
 
 
-def run_code(code: str):
+def run_code(code: str, context: Optional[Context] = None):
     """
     Python Code Interpreter
     Use print() to output each demanded result
@@ -10,6 +12,7 @@ def run_code(code: str):
 
     Args:
         code: The code to run
+        context: The context of the workflow
 
     Returns:
         The result of the code

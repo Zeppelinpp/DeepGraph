@@ -34,8 +34,10 @@ def safe_serialize(data: Any) -> str:
 
     try:
         converted_data = convert_bytes(data)
-        return orjson.dumps(converted_data, option=orjson.OPT_SORT_KEYS).decode("utf-8")
-    except (TypeError, ValueError, orjson.JSONEncodeError) as e:
+        return json.dumps(
+            converted_data, sort_keys=True, ensure_ascii=False, default=str
+        )
+    except (TypeError, ValueError) as e:
         try:
             return json.dumps(
                 converted_data, sort_keys=True, ensure_ascii=False, default=str

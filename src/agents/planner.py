@@ -5,6 +5,8 @@ from src.utils.retriever import KnowledgeRetriever
 from src.models.base import TaskList
 from src.prompts.planner_prompts import PLANNER_PROMPT, INTENTION_RECOGNITION_PROMPT
 from src.utils.logger import logger
+from typing import Optional
+from llama_index.core.workflow import Context
 
 
 class Planner:
@@ -36,11 +38,12 @@ class Planner:
             import json
             return json.loads(content)
 
-    async def plan(self, query: str):
+    async def plan(self, query: str, context: Optional[Context] = None):
         intention = await self.intention_recognition(query)
         framework_key = intention["intention"]
         analysis_knowledge = self.knowledge_retriever.retrieve(framework_key)
-        
+        if context:
+            analysis_knowledge = await context.store.get("analysis_framework")
         # Log framework extraction for traceability
         logger.log_planner_framework_extraction(
             query=query,

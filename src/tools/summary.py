@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 from src.agents.base import FunctionCallingAgent
 from src.tools.code import run_code
 from src.utils.tools import tools_to_openai_schema
+from llama_index.core.workflow import Context
 
 # 导入必要的库
 try:
@@ -91,31 +92,27 @@ def call_llm_api(prompt: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def generate_summary_report(
-    section_title: str = "财务分析小节"
+async def generate_summary_report(
+    section_title: str = "财务分析小节",
+    context: Optional[Context] = None
 ) -> str:
     """
     根据分析思路、查询数据和指标计算结果生成财务分析报告小节。
 
     Args:
         section_title (str): 报告小节的标题，默认为"财务分析小节"
-
+        context: The context of the workflow
     Returns:
         str: 包含生成报告小节的JSON字符串，如果调用失败则返回错误信息
     """
     #TODO 获取数据
-    get_DATA = analysis_thought  # analysis_thought (str): 自然语言分析思路
-    get_DATA = query_data   # query_data (List[Dict[str, Any]]): 从Nebula数据库查询到的原始数据
-    get_DATA = indicator_results  # indicator_results (List[Dict[str, Any]]): 指标计算工具返回的计算结果
+    if context:
+        analysis_thought = await context.store.get("analysis_framework", None) # analysis_thought (str): 自然语言分析思路
+        query_data = await context.store.get("query_data", None) # query_data (List[Dict[str, Any]]): 从Nebula数据库查询到的原始数据
+        indicator_results = await context.store.get("indicator_results", None) # indicator_results (List[Dict[str, Any]]): 指标计算工具返回的计算结果
 
-
-
-
-
-
-
-
-
+    if not analysis_thought or not query_data or not indicator_results:
+        return "请先使用`nebula_query_tool`工具或者`indicator_calculator`工具获取指标分析数据"
     # 将数据转换为JSON字符串以便在prompt中使用
     query_data_str = json.dumps(query_data, ensure_ascii=False, indent=2)
     indicator_results_str = json.dumps(indicator_results, ensure_ascii=False, indent=2)
