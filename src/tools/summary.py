@@ -93,7 +93,7 @@ def call_llm_api(prompt: str) -> Optional[Dict[str, Any]]:
 
 
 async def generate_summary_report(
-    section_title: str = "财务分析小节",
+    section_title: str,
     context: Optional[Context] = None
 ) -> str:
     """

@@ -15,6 +15,7 @@ from src.prompts.worker_prompts import WORKER_USER_PROMPT
 from src.tools.web import search_web
 from src.tools.code import run_code
 from config.settings import settings
+from src.utils.nebula import execute_ngql
 from src.utils.logger import logger
 from src.utils.web_logger import web_logger
 
@@ -33,6 +34,8 @@ class DeepGraphWorkflow(Workflow):
 
         await ctx.store.set("query", ev.query)
         await ctx.store.set("session_id", ev.session_id)
+        available_node_types = execute_ngql("SHOW TAGS")
+        await ctx.store.set("available_node_types", available_node_types)
 
         task_list = await self.planner.plan(ev.query)
 
@@ -100,7 +103,8 @@ class DeepGraphWorkflow(Workflow):
                 context=ctx,
             )
             # TODO Retrieve schema context -> Get Schema
-            retrieved_context = None
+            retrieved_context = await ctx.store.get("available_node_types")
+            retrieved_context = f"可选的Node Types: {retrieved_context}"
             task_prompt = WORKER_USER_PROMPT.format(
                 previous_task_results=previous_task_results,
                 retrieved_context=retrieved_context,
@@ -151,7 +155,8 @@ class DeepGraphWorkflow(Workflow):
                 context=ctx,
             )
             # TODO Retrieve schema context -> Get Schema
-            retrieved_context = None
+            retrieved_context = await ctx.store.get("available_node_types")
+            retrieved_context = f"可选的Node Types: {retrieved_context}"
             task_prompt = WORKER_USER_PROMPT.format(
                 previous_task_results=[],
                 retrieved_context=retrieved_context,
