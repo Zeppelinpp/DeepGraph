@@ -92,20 +92,19 @@ def call_llm_api(prompt: str) -> Optional[Dict[str, Any]]:
 
 
 def calculate_indicator(
-    financial_data: List[Dict[str, Any]],
     analysis_task: str
 ) -> str:
     """
     根据提供的财务数据列表和自然语言描述的分析任务，智能调用大模型进行分析。
 
     Args:
-        financial_data: 包含一个或多个周期的财务数据的列表。
         analysis_task: 需要执行的财务分析任务的自然语言描述。
 
     Returns:
         包含分析结果的JSON字符串，如果调用失败则返回错误信息。
     """
-    data_str = json.dumps(financial_data, ensure_ascii=False, indent=2)
+    # todo 需要nebula结果
+    data_str = tool_data.get("financial_data")
 
     prompt_template = """
 你是一位顶级的财务分析AI专家。你的核心任务是根据提供的JSON格式的财务数据（一个时间序列数组），执行一个指定的分析任务。
@@ -157,7 +156,8 @@ def calculate_indicator(
     
     full_prompt = prompt_template.format(data_str=data_str, analysis_task=analysis_task)
     result = call_llm_api(full_prompt)
-    # Save
+    # todo Save
+
     if result:
         return json.dumps(result, ensure_ascii=False, indent=2)
     else:
