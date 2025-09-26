@@ -100,6 +100,50 @@ class Worker(FunctionCallingAgent):
         cache_hash = hashlib.md5(cache_string.encode()).hexdigest()
         return cache_hash
 
+    async def _execute_tool_with_context(self, tool_call: Dict[str, Any]) -> str:
+        """
+        Execute tool call with context if the tool function supports it
+        """
+        
+        try:
+            function_name = tool_call["function"]["name"]
+            function_arguments = tool_call["function"]["arguments"]
+            
+            # 安全解析参数
+            if isinstance(function_arguments, str):
+                try:
+                    function_args = orjson.loads(function_arguments)
+                except (orjson.JSONDecodeError, TypeError):
+                    try:
+                        import json
+                        function_args = json.loads(function_arguments)
+                    except (json.JSONDecodeError, TypeError):
+                        function_args = function_arguments
+            else:
+                function_args = function_arguments
+
+            if function_name not in self.tools_registry:
+                return (
+                    f"Execute Tool Function Error: Function {function_name} not found"
+                )
+
+            tool_function = self.tools_registry[function_name]
+            if hasattr(tool_function, "__call__"):
+                # Check if the function accepts a 'context' parameter
+                if self.context:
+                    result = tool_function(**function_args, context=self.context)
+                else:
+                    result = tool_function(**function_args)
+                if hasattr(result, "__await__"):
+                    result = await result
+
+                return str(result)
+            else:
+                return f"Execute Tool Function Error: Function {function_name} is not callable"
+
+        except Exception as e:
+            return f"Execute Tool Function Error: {e}"
+
     @override
     async def _handle_tool_call(self, tool_call: Dict[str, Any]) -> str:
         # Generate cache key
@@ -109,9 +153,6 @@ class Worker(FunctionCallingAgent):
         tool_name = tool_call["function"]["name"]
         # 安全解析参数
         function_arguments = tool_call["function"]["arguments"]
-
-        if self.context:
-            tool_call["function"]["arguments"]["context"] = self.context
 
         if isinstance(function_arguments, str):
             tool_args = safe_deserialize(function_arguments)
@@ -146,7 +187,7 @@ class Worker(FunctionCallingAgent):
                 )
             else:
                 # Execute tool call and cache result
-                tool_result = await super()._handle_tool_call(tool_call)
+                tool_result = await self._execute_tool_with_context(tool_call)
                 duration_ms = (
                     time.time() - start_time
                 ) * 1000  # Convert to milliseconds
@@ -185,7 +226,7 @@ class Worker(FunctionCallingAgent):
             # If Redis is not available, fall back to direct execution
             duration_ms = (time.time() - start_time) * 1000
             print(f"Redis cache error: {e}, falling back to direct execution")
-            tool_result = await super()._handle_tool_call(tool_call)
+            tool_result = await self._execute_tool_with_context(tool_call)
 
             # Log the fallback execution
             logger.log_task_tool_call(
@@ -215,6 +256,9 @@ class Worker(FunctionCallingAgent):
                     }
                 ]
             await self.context.store.set(self.assigned_task.name, worker_result)
+
+            # Store tool result without binding to task
+            await self.context.store.set(tool_name, tool_result)
 
         return tool_result
 
