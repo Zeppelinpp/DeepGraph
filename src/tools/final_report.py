@@ -42,42 +42,6 @@ except KeyError as e:
     stop=stop_after_attempt(3),
     retry_error_callback=lambda rs: logging.error(f"API调用在 {rs.attempt_number} 次尝试后最终失败。")
 )
-def _call_llm_json(prompt: str) -> Optional[Dict[str, Any]]:
-    """
-    调用大模型并以 JSON 对象形式返回解析内容。
-
-    Args:
-        prompt: 完整提示词
-
-    Returns:
-        解析后的 JSON 字典；失败时返回 None。
-    """
-    try:
-        resp = client.chat.completions.create(
-            model=TOOL_MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            tools=None,
-            temperature=0.2,
-        )
-        content = resp.choices[0].message.content
-        if not content:
-            logging.error("API响应为空")
-            return None
-        return json.loads(content)
-    except (RateLimitError, APIConnectionError) as e:
-        logging.warning(f"可重试API错误: {e}")
-        raise
-    except APIError as e:
-        logging.error(f"不可重试API错误: {e}")
-        return None
-    except json.JSONDecodeError as e:
-        logging.error(f"JSON解析失败: {e}")
-        return None
-    except Exception as e:
-        logging.error(f"未知错误: {e}")
-        return None
-
 
 def _call_llm_text(prompt: str) -> Optional[str]:
     """
@@ -107,12 +71,17 @@ def _call_llm_text(prompt: str) -> Optional[str]:
 
 
 def generate_final_report(
-    analysis_template: str,
-    summaries: List[Dict[str, Any]],
-    query_data: List[Dict[str, Any]],
-    indicator_results: List[Dict[str, Any]],
     report_title: str = "公司财务分析报告（最终版）"
 ) -> Optional[str]:
+
+
+    #TODO 获取数据
+    get_DATA = analysis_template  # analysis_template: 用户提供的自然语言或Markdown格式的报告分析框架/模板。
+    get_DATA = summaries   # summaries: 前面各小节summary的结构化结果数组。
+    get_DATA = query_data  # query_data: 原始查询数据，供参考和细节追溯。
+    get_DATA = indicator_results  # indicator_results: 指标计算结果，供参考和细节追溯。
+
+
     """
     根据动态传入的分析模板，将多个分析小结整合成一篇高质量的最终财务分析报告。
 
@@ -123,10 +92,6 @@ def generate_final_report(
     4. 数据追溯：提供`query_data`和`indicator_results`作为备用数据，供LLM在需要时查阅细节。
 
     Args:
-        analysis_template: 用户提供的自然语言或Markdown格式的报告分析框架/模板。
-        summaries: 前面各小节summary的结构化结果数组。
-        query_data: 原始查询数据，供参考和细节追溯。
-        indicator_results: 指标计算结果，供参考和细节追溯。
         report_title: 最终报告标题。
 
     Returns:
