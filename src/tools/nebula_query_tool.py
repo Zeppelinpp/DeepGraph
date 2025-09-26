@@ -75,6 +75,17 @@ def _build_ngql_prompt_for_question(question: str, schema: Dict[str, Any], limit
 1. WHERE 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`会计年度` == 2024
 2. RETURN 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`需要返回的属性名`
 3. NebulaGraph的版本是3.10, 请使用相应的NGQL语法
+使用注意事项:
+1. 仅返回与问题相关的属性，不要返回与问题无关的属性
+2. 如果问题中没有明确指出需要返回哪些属性，请根据业务知识返回所有相关的属性
+3. 使用NGQL 3.x 的语法
+4. WHERE 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`会计年度` == 2024
+5. RETURN 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`需要返回的属性名`
+
+财务知识:
+1. 损益本位币即利润
+2. 借方是收入，贷方是支出
+
 
 示例：
 MATCH (v:`凭证分录`) WHERE v.`凭证分录`.`会计年度` == 2024 AND v.`凭证分录`.`期间` == 12 RETURN v.`凭证分录`.`需要返回的属性名` LIMIT ["需要限制的条数"] // 替换为实际属性名，如"凭证号"
@@ -118,7 +129,6 @@ def _generate_ngql_from_llm_by_question(question: str, node_types:List[str], lim
             # 移除LLM可能添加的代码块标记
             if ngql_query.startswith("```"):
                 ngql_query = ngql_query.strip("```sql\n").strip("```").strip()
-            print(f"--- [INFO] Successfully generated nGQL ---\n{ngql_query}")
             return ngql_query
         return None
     except Exception as e:
@@ -157,15 +167,30 @@ async def nebula_query(question: str, node_types: List[str], limit: Optional[int
             session.execute(f"USE `{NEBULA_GRAPH_SPACE}`;")
             print("--- [INFO] Executing nGQL on NebulaGraph ---")
             print(ngql_statement)
-            result = session.execute(ngql_statement).as_primitive()
-            for row in result:
-                results_list.append(row)
+            result = session.execute(ngql_statement)
+            if result.is_succeeded():
+                for row in result.as_primitive():
+                    results_list.append(row)
+            else:
+                return f"[ERROR] An exception occurred during nGQL execution: {result.error_msg()}"
 
         pool.close()
         result = pd.DataFrame(results_list).to_markdown(index=False)
         # todo save result
         if context:
             await context.store.set("query_data", results_list)
+
+        return result
+        result = pd.DataFrame(results_list).to_markdown(index=False)
+        # todo save result
+        if context:
+            query_data = await context.store.get("query_data", [])
+            new_data = {
+                "question": question,
+                "result": results_list,
+            }
+            query_data.append(new_data)
+            await context.store.set("query_data", query_data)
 
         return result
     except Exception as e:
