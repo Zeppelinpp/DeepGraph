@@ -89,7 +89,7 @@ def call_llm_api(prompt: str) -> Optional[Dict[str, Any]]:
 
 
 # --- 3. 异常检测模块 ---
-def detect_anomaly(indicator_result: Any) -> Dict[str, List[Dict[str, Any]]]:
+def anomaly_detect(indicator_result: Any) -> Dict[str, List[Dict[str, Any]]]:
     """
     输入: 单个或批量指标的计算结果
     输出: {"anomaly_query_result": List[Dict]} 统一为 list
@@ -249,7 +249,7 @@ if __name__ == "__main__":
 
             # 2. 生成自然语言查询
             logging.info(f"分析任务 '{task}' 的异常数据，生成查询语句...")
-            anomaly_query = detect_anomaly(result)
+            anomaly_query = anomaly_detect(result)
 
             # 3. 打印结果（格式化输出，便于后续工具调用）
             print("\n【异常分析与自然语言查询结果】")

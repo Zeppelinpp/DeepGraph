@@ -143,7 +143,7 @@ def _generate_ngql_from_llm_by_question(question: str, schema: Dict[str, Any]) -
         return None
 
 
-def source_anomaly(
+def anomaly_source(
     anomaly_results: List[Dict[str, Any]], 
     use_llm: bool = False, 
     limit: int = 50, 
@@ -252,5 +252,5 @@ if __name__ == "__main__":
     ]
 
 
-    res = source_anomaly(anomaly_results=test_anomaly_results,use_llm=False)
+    res = anomaly_source(anomaly_results=test_anomaly_results,use_llm=False)
     print(res)
