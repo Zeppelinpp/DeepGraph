@@ -71,6 +71,10 @@ def _build_ngql_prompt_for_question(question: str, schema: Dict[str, Any], limit
     rules = """
 生成可直接执行的 nGQL 查询，仅返回 nGQL 一行或多行，不要解释、不要包裹代码块标记。
 
+重要格式要求：
+1. WHERE 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`会计年度` == 2024
+2. RETURN 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`需要返回的属性名`
+3. NebulaGraph的版本是3.10, 请使用相应的NGQL语法
 使用注意事项:
 1. 仅返回与问题相关的属性，不要返回与问题无关的属性
 2. 如果问题中没有明确指出需要返回哪些属性，请根据业务知识返回所有相关的属性
@@ -174,6 +178,12 @@ async def nebula_query(question: str, node_types: List[str], limit: Optional[int
                 return f"[ERROR] An exception occurred during nGQL execution: {result._resp.error_msg.decode('utf-8')}"
 
         pool.close()
+        result = pd.DataFrame(results_list).to_markdown(index=False)
+        # todo save result
+        if context:
+            await context.store.set("query_data", results_list)
+
+        return result
         result = pd.DataFrame(results_list).to_markdown(index=False)
         # todo save result
         if context:
