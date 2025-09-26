@@ -109,6 +109,10 @@ class Worker(FunctionCallingAgent):
         tool_name = tool_call["function"]["name"]
         # 安全解析参数
         function_arguments = tool_call["function"]["arguments"]
+
+        if self.context:
+            tool_call["function"]["arguments"]["context"] = self.context
+
         if isinstance(function_arguments, str):
             tool_args = safe_deserialize(function_arguments)
         else:
