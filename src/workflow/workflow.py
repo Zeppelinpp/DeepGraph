@@ -12,7 +12,9 @@ from src.models.events import (
     TaskResultEvent,
 )
 from src.prompts.worker_prompts import WORKER_USER_PROMPT
-from src.tools.web import search_web
+from src.tools.nebula_query_tool import nebula_query
+from src.tools.indicator_calculator import calculate_indicator
+from src.tools.summary import generate_summary_report
 from src.tools.code import run_code
 from config.settings import settings
 from src.utils.nebula import execute_ngql
@@ -57,7 +59,8 @@ class DeepGraphWorkflow(Workflow):
         if task_list.sequential_tasks:
             ctx.send_event(SequentialSubTaskEvent(task_list=task_list.sequential_tasks))
         if task_list.parallel_tasks:
-            ctx.send_event(ParallelSubTaskEvent(task_list=task_list.parallel_tasks))
+            # ctx.send_event(ParallelSubTaskEvent(task_list=task_list.parallel_tasks))
+            pass
 
     async def _execute_single_task_async(
         self, worker: Worker, task, task_prompt: str
@@ -89,6 +92,8 @@ class DeepGraphWorkflow(Workflow):
 
         previous_task_results = []
         task_report = ""
+        retrieved_context = await ctx.store.get("available_node_types")
+        retrieved_context = f"可选的Node Types: {retrieved_context}"
         for task in ev.task_list:
             # Log task execution start
             logger.log_task_execution_start(task.name, "Sequential", task.description)
@@ -98,13 +103,12 @@ class DeepGraphWorkflow(Workflow):
                 name="worker",
                 description=f"Worker for task: {task.name}",
                 model=settings.agent_settigns["worker_model"],
-                tools=[search_web, run_code],
+                tools=[nebula_query, calculate_indicator, generate_summary_report],
                 assigned_task=task,
                 context=ctx,
             )
             # TODO Retrieve schema context -> Get Schema
-            retrieved_context = await ctx.store.get("available_node_types")
-            retrieved_context = f"可选的Node Types: {retrieved_context}"
+            
             task_prompt = WORKER_USER_PROMPT.format(
                 previous_task_results=previous_task_results,
                 retrieved_context=retrieved_context,
@@ -150,7 +154,7 @@ class DeepGraphWorkflow(Workflow):
                 name="worker",
                 description=f"Worker for task: {task.name}",
                 model=settings.agent_settigns["worker_model"],
-                tools=[search_web, run_code],
+                tools=[nebula_query, calculate_indicator, generate_summary_report],
                 assigned_task=task,
                 context=ctx,
             )
@@ -304,7 +308,7 @@ async def main():
     workflow = DeepGraphWorkflow()
 
     try:
-        result = await workflow.run_with_web_logging("金蝶国际最近半年的财务分析")
+        result = await workflow.run_with_web_logging("本用的财务状况分析")
         print("Workflow execution completed:")
         print(result)
 
