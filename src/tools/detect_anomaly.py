@@ -193,6 +193,17 @@ def source_anomaly(all_analyses_text:str) -> Optional[Dict[str, Any]]:
 
 # --- 4. 主程序（保持任务执行逻辑，适配新的输出格式） ---
 if __name__ == "__main__":
+    
+    # 1. 计算指标（真实）
+    indicators = get_indicators()  # List[Dict[str, Any]] 
+
+    # 2. 生成异常检测的自然语言查询
+    anomaly_query = source_anomaly(indicators)  # str -> Optional[Dict[str, Any]]
+
+    # 3. 打印结果（格式化输出，便于后续工具调用）
+    logging.info("使用异常分析工具，异常分析结果：")
+    logging.info(json.dumps(anomaly_query, ensure_ascii=False, indent=2))
+
     try:
 
         # 示例财务数据（含备注信息，用于生成查询）
