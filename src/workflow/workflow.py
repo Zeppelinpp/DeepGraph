@@ -39,7 +39,7 @@ class DeepGraphWorkflow(Workflow):
         available_node_types = execute_ngql("SHOW TAGS")
         await ctx.store.set("available_node_types", available_node_types)
 
-        task_list = await self.planner.plan(ev.query)
+        task_list = await self.planner.plan(ev.query, ctx)
 
         # Record tool call for each task
         for task in task_list.sequential_tasks:
@@ -219,7 +219,7 @@ class DeepGraphWorkflow(Workflow):
 
     @step
     async def report(self, ev: TaskResultEvent, ctx: Context) -> StopEvent:
-        task_result_events = ctx.collect_events(ev, [TaskResultEvent] * 2)
+        task_result_events = ctx.collect_events(ev, [TaskResultEvent] * 1)
 
         task_infos = []
         if task_result_events:
