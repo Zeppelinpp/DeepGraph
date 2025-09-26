@@ -1,4 +1,4 @@
-from typing import Callable, List, Dict, Any
+from typing import Callable, List, Dict, Any, Optional
 import inspect
 from typing import Union
 
@@ -60,6 +60,16 @@ def tools_to_openai_schema(tools: List[Callable]) -> List[Dict[str, Any]]:
             ):
                 continue
 
+            # Skip Optional parameters
+            if param.annotation != inspect.Parameter.empty:
+                annotation = param.annotation
+                if hasattr(annotation, "__origin__") and annotation.__origin__ is Union:
+                    # Handle Optional types (Union[T, None])
+                    args = annotation.__args__
+                    if len(args) == 2 and type(None) in args:
+                        # This is Optional[T], skip it
+                        continue
+
             # Determine parameter type from annotation
             param_type = "string"  # default type
             param_description = f"Parameter {param_name}"
@@ -70,18 +80,7 @@ def tools_to_openai_schema(tools: List[Callable]) -> List[Dict[str, Any]]:
                 # Handle typing annotations
                 if hasattr(annotation, "__origin__"):
                     origin = annotation.__origin__
-                    if origin is Union:
-                        # Handle Optional types (Union[T, None])
-                        args = annotation.__args__
-                        if len(args) == 2 and type(None) in args:
-                            # This is Optional[T]
-                            non_none_type = next(
-                                arg for arg in args if arg is not type(None)
-                            )
-                            param_type = _get_json_type(non_none_type)
-                        else:
-                            param_type = "string"  # fallback for complex unions
-                    elif origin is list:
+                    if origin is list:
                         param_type = "array"
                     elif origin is dict:
                         param_type = "object"
@@ -114,3 +113,10 @@ def tools_to_openai_schema(tools: List[Callable]) -> List[Dict[str, Any]]:
         openai_functions.append(function_def)
 
     return openai_functions
+
+
+if __name__ == "__main__":
+    def fool(a: int, b: int, c: Optional[int] = None) -> int:
+        return a + b
+
+    print(tools_to_openai_schema([fool]))

@@ -157,7 +157,7 @@ def calculate_indicator(
     
     full_prompt = prompt_template.format(data_str=data_str, analysis_task=analysis_task)
     result = call_llm_api(full_prompt)
-    
+    # Save
     if result:
         return json.dumps(result, ensure_ascii=False, indent=2)
     else:

@@ -19,7 +19,7 @@ def nebula_query(node_types: List[str], query: str) -> DataFrame:
 
 ## 指标计算 `indicator_caculate`
 ```python
-def indicator_caculate(indicator_type: str):
+def indicator_caculate(indicator_type: str) -> Dict[str, Any]:
     """
     type: 什么类型的指标
     """
