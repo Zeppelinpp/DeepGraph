@@ -1,5 +1,8 @@
 import asyncio
-from llama_index.core.workflow import Context, Workflow, StartEvent, StopEvent, step
+import orjson
+import json
+import os
+from llama_index.core.workflow import Context, Workflow, StartEvent, StopEvent, step, JsonSerializer
 from src.agents.planner import Planner
 from src.agents.worker import Worker
 from src.agents.reporter import Reporter
@@ -29,6 +32,7 @@ class DeepGraphWorkflow(Workflow):
         logger.log_workflow_step("plan", "StartEvent", f"Query: {ev.query}")
 
         await ctx.store.set("query", ev.query)
+        await ctx.store.set("session_id", ev.session_id)
 
         task_list = await self.planner.plan(ev.query)
 
@@ -235,6 +239,15 @@ class DeepGraphWorkflow(Workflow):
                     print(chunk, end="")
                     report += chunk
                 print("\n")
+
+                # Save context
+                session_id = await ctx.store.get("session_id")
+                context_dict = ctx.store.to_dict(serializer=JsonSerializer())
+                
+                # create file in src/context as context_{session_id} with project root
+                context_file = os.path.join(os.path.dirname(__file__), "..", "context", f"context_{session_id}.json")
+                with open(context_file, "w", encoding="utf-8") as f:
+                    json.dump(context_dict, f, ensure_ascii=False, indent=2)
                 return StopEvent(result=report)
 
     async def run_with_web_logging(self, query: str):
@@ -244,7 +257,7 @@ class DeepGraphWorkflow(Workflow):
 
         try:
             # Run workflow
-            result = await self.run(query=query)
+            result = await self.run(query=query, session_id=session_id)
 
             # Mark session completed
             web_logger.end_run("completed")

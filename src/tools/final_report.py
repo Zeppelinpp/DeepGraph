@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from llama_index.core.workflow import Context
 from typing import List, Dict, Any, Optional
 
 # 导入必要的库
@@ -70,16 +71,20 @@ def _call_llm_text(prompt: str) -> Optional[str]:
 
 
 
-def generate_final_report(
-    report_title: str = "公司财务分析报告（最终版）"
+async def generate_final_report(
+    report_title: str = "公司财务分析报告（最终版）",
+    context: Optional[Context] = None
 ) -> Optional[str]:
 
 
     #TODO 获取数据
-    get_DATA = analysis_template  # analysis_template: 用户提供的自然语言或Markdown格式的报告分析框架/模板。
-    get_DATA = summaries   # summaries: 前面各小节summary的结构化结果数组。
-    get_DATA = query_data  # query_data: 原始查询数据，供参考和细节追溯。
-    get_DATA = indicator_results  # indicator_results: 指标计算结果，供参考和细节追溯。
+    analysis_template = await context.store.get("analysis_framework", None) # analysis_template: 用户提供的自然语言或Markdown格式的报告分析框架/模板。
+    summaries = await context.store.get("summaries", None) # summaries: 前面各小节summary的结构化结果数组。
+    query_data = await context.store.get("query_data", None) # query_data: 原始查询数据，供参考和细节追溯。
+    indicator_results = await context.store.get("indicator_results", None) # indicator_results: 指标计算结果，供参考和细节追溯。
+
+    if not analysis_template or not summaries or not query_data or not indicator_results:
+        return "请先使用`nebula_query_tool`工具或者`indicator_calculator`工具获取指标分析数据"
 
 
     """
