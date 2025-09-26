@@ -1,11 +1,12 @@
 import os
 import json
 import logging
+import asyncio
 from typing import List, Dict, Any, Optional
 from src.agents.base import FunctionCallingAgent
 from src.tools.code import run_code
 from src.utils.tools import tools_to_openai_schema
-
+from llama_index.core.workflow import Context
 # 导入必要的库
 try:
     import openai
@@ -91,20 +92,24 @@ def call_llm_api(prompt: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def calculate_indicator(
-    analysis_task: str
+async def calculate_indicator(
+    analysis_task: str,
+    context: Optional[Context] = None
 ) -> str:
     """
-    根据提供的财务数据列表和自然语言描述的分析任务，智能调用大模型进行分析。
+    指标计算工具, 根据输入的指标分析目标进行指标分析
 
     Args:
-        analysis_task: 需要执行的财务分析任务的自然语言描述。
+        analysis_task: 需要执行的指标分析任务的自然语言描述。
 
     Returns:
-        包含分析结果的JSON字符串，如果调用失败则返回错误信息。
+        包含指标分析结果的JSON字符串，如果调用失败则返回错误信息。
     """
     # todo 需要nebula结果
-    data_str = tool_data.get("financial_data")
+    data_str = await context.store.get("query_data")
+
+    if not data_str:
+        return f"请先使用`nebula_query_tool`工具获取指标计算需要的数据"
 
     prompt_template = """
 你是一位顶级的财务分析AI专家。你的核心任务是根据提供的JSON格式的财务数据（一个时间序列数组），执行一个指定的分析任务。
@@ -157,6 +162,8 @@ def calculate_indicator(
     full_prompt = prompt_template.format(data_str=data_str, analysis_task=analysis_task)
     result = call_llm_api(full_prompt)
     # todo Save
+    if context:
+        await context.store.set("indicator_results", result)
 
     if result:
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -193,7 +200,7 @@ if __name__ == "__main__":
         print("="*80)
 
         # 调用核心函数进行分析
-        result = calculate_indicator(sample_financial_data, task)
+        result = asyncio.run(calculate_indicator(sample_financial_data, task))
 
         # 格式化并打印结果
         if result:

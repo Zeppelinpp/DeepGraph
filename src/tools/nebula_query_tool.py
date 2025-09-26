@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from src.utils.nebula import get_schema
 import pandas as pd
-
+from llama_index.core.workflow import Context
 from nebula3.gclient.net import ConnectionPool
 from nebula3.Config import Config
 
@@ -72,15 +72,13 @@ def _build_ngql_prompt_for_question(question: str, schema: Dict[str, Any], limit
 生成可直接执行的 nGQL 查询，仅返回 nGQL 一行或多行，不要解释、不要包裹代码块标记。
 
 重要格式要求：
-1. 只使用 MATCH 语句，格式：MATCH (v:标签名) WHERE 条件 RETURN v 
-2. 标签名和属性名用反引号包围，如：`凭证分录`、`会计年度`
-3. 数字比较不要加引号，如：v.`会计年度` == 2024
-4. 字符串比较要加引号，如：v.`科目名称` == "现金"
-5. 让数据库返回所有匹配结果
+1. WHERE 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`会计年度` == 2024
+2. RETURN 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`需要返回的属性名`
+3. NebulaGraph的版本是3.10, 请使用相应的NGQL语法
 
 示例：
-MATCH (v:`凭证分录`) WHERE v.`会计年度` == 2024 AND v.`期间` == 12 RETURN properties(v)["需要返回的属性名"] LIMIT ["需要限制的条数"] // 替换为实际属性名，如"凭证号"
-MATCH (v:`凭证分录`) WHERE v.`科目编码` == "1001" RETURN properties(v)["需要返回的属性名"] LIMIT ["需要限制的条数"]
+MATCH (v:`凭证分录`) WHERE v.`凭证分录`.`会计年度` == 2024 AND v.`凭证分录`.`期间` == 12 RETURN v.`凭证分录`.`需要返回的属性名` LIMIT ["需要限制的条数"] // 替换为实际属性名，如"凭证号"
+MATCH (v:`凭证分录`) WHERE v.`凭证分录`.`科目编码` == "1001" RETURN v.`凭证分录`.`需要返回的属性名` LIMIT ["需要限制的条数"]
 """
     prompt = f"""
 # 任务：将自然语言问题翻译为 nGQL
@@ -130,17 +128,17 @@ def _generate_ngql_from_llm_by_question(question: str, node_types:List[str], lim
 
 
 
-def nebula_query(question: str, node_types: List[str], limit: Optional[int]=NEBULA_QUERY_TIMEOUT) -> str:
+async def nebula_query(question: str, node_types: List[str], limit: Optional[int]=NEBULA_QUERY_TIMEOUT, context: Optional[Context] = None) -> str:
     """
-    将自然语言问题转换为 nGQL 并在 NebulaGraph 上执行，返回 JSON 字符串结果。
+    Nebula图数据库查询工具，根据输入的自然语言问题和节点类型生成nGQL并在NebulaGraph上执行，返回Markdown格式的结果。
 
     参数：
-    - question: 自然语言问题，例如“查询2024年期间为12的凭证分录的借方金额前10行”。
-    - node_types: 节点类型，例如“凭证分录”。
+    - question: 查询任务， 例如“查询2024年期间为12的凭证分录的借方金额前10行”。
+    - node_types: 节点类型，例如["凭证分录"]。
     - limit: 可选，限制返回行数。
 
     返回：
-    - JSON 字符串（列表），每个元素为一行记录的属性字典；失败时返回错误信息 JSON。
+    - Markdown格式的结果，每个元素为一行记录的属性字典；失败时返回错误信息。
     """
 
     ngql_statement = _generate_ngql_from_llm_by_question(question, node_types, limit)
@@ -166,6 +164,8 @@ def nebula_query(question: str, node_types: List[str], limit: Optional[int]=NEBU
         pool.close()
         result = pd.DataFrame(results_list).to_markdown(index=False)
         # todo save result
+        if context:
+            await context.store.set("query_data", results_list)
 
         return result
     except Exception as e:

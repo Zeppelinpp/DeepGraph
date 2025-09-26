@@ -8,8 +8,8 @@ WORKER_PROMPT = """
 
 <工具>
 - `nebula_query` 查询Nebula图数据库, 入参需要与查询相关的node_types和查询目标, node_types请根据查询目标和可选的node_types选择与查询目标相关的node_types
-- `indicator_calculator` 指标计算工具, 入参是需要计算的指标类型，比如环比/同比，费用占用率等 和计算目标
-- `summary` 总结工具，根据一个固定的模板对任务的执行结果进行总结
+- `calculate_indicator` 指标计算工具, 入参是需要计算的指标类型，比如环比/同比，费用占用率等 和计算目标
+- `generate_summary_report` 总结工具，根据一个固定的模板对任务的执行结果进行总结
 </工具>
 
 <指引>

@@ -142,4 +142,4 @@ def get_schema(node_types: List[str]) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     # Example usage - replace with actual node types from your graph
-    print(get_schema(["人员", "凭证分录"]))
+    print(get_schema(["科目余额", "会计科目"]))
