@@ -77,6 +77,9 @@ def _build_ngql_prompt_for_question(question: str, schema: Dict[str, Any], limit
 3. 使用NGQL 3.x 的语法
 4. WHERE 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`会计年度` == 2024
 5. RETURN 语句中使用 `.` 来访问嵌套属性，如：v.`凭证分录`.`需要返回的属性名`
+6. Nebula Graph 语法常见错误: 
+- SemanticError: number of columns to UNION/INTERSECT/MINUS must be same: 所有子查询返回的列数和列名一致，否则会抛出异常
+- SemanticError: different column names to UNION/INTERSECT/MINUS are not supported: 所有子查询返回的列名一致，否则会抛出异常
 
 财务知识:
 1. 损益本位币即利润
@@ -168,7 +171,7 @@ async def nebula_query(question: str, node_types: List[str], limit: Optional[int
                 for row in result.as_primitive():
                     results_list.append(row)
             else:
-                return f"[ERROR] An exception occurred during nGQL execution: {result.error_msg()}"
+                return f"[ERROR] An exception occurred during nGQL execution: {result._resp.error_msg.decode('utf-8')}"
 
         pool.close()
         result = pd.DataFrame(results_list).to_markdown(index=False)
